@@ -112,7 +112,7 @@ export default function GuideParent() {
           <ul className="space-y-1.5 text-sm text-leaf-900">
             <li>• Review and save orders during the meal selection days shown by your school.</li>
             <li>• You can order for multiple children in one visit.</li>
-            <li>• A blank choice does not create a new order or cancel an existing order. Contact the school to cancel a saved meal.</li>
+            <li>• A blank choice does not create a new order or cancel an existing order.</li>
             <li>• If you miss the window, contact the <strong>parent administrator</strong> for help.</li>
           </ul>
         </div>
