@@ -5,7 +5,6 @@ import { orderingDayText } from "../../lib/semester";
 
 export default function GuideAdmin() {
   const { orderingDays } = useSemester();
-  const schoolAddress = window.location.host;
   return (
     <div className="mx-auto max-w-3xl py-4">
 
@@ -170,7 +169,7 @@ export default function GuideAdmin() {
 
         {/* Footer */}
         <div className="mt-10 border-t border-line pt-5 text-center text-xs text-ink-faint">
-          Cliffs Lunch Club · {schoolAddress} · Admin Guide
+          Cliffs Lunch Club · Admin Guide
         </div>
       </div>
     </div>

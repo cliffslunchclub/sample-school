@@ -2,7 +2,6 @@ import { Printer } from "lucide-react";
 import { APP_VERSION, GUIDE_UPDATED } from "../../lib/version";
 
 export default function GuideParent() {
-  const schoolAddress = window.location.host;
   return (
     <div className="mx-auto max-w-3xl py-4">
 
@@ -120,7 +119,7 @@ export default function GuideParent() {
 
         {/* Footer */}
         <div className="mt-10 border-t border-line pt-5 text-center text-xs text-ink-faint">
-          Cliffs Lunch Club · {schoolAddress}
+          Cliffs Lunch Club
         </div>
       </div>
     </div>
