@@ -34,3 +34,11 @@ Deployment preparation verified (2026-10-01):
 - Regression tests, TypeScript check and both production builds pass.
 
 No SiteGround/PocketHost account, DNS or live installation was changed. Actual provider version support, hosted migration startup, browser workflows and label alignment remain deployment checks.
+
+
+Version 1.1.0 verified:
+
+- Fresh sample seed creates four parent families and 11 students, with 473 selections across the default semester's 43 weekday dates. Selected meals match weekday availability and school/parent/student relations; delivery times follow class rules.
+- Existing meal records are retained unchanged. Repeated startup does not duplicate students/orders or rerandomize saved menus. Fresh CHS receives no demo users/students/orders.
+- Parent/Admin guides now use the current domain and school ordering settings, carry version 1.1.0/update date, and cover five-day meals, current account controls, admin creation, separate audit history and student-only labels.
+- Regression tests, TypeScript check and frontend/sample/CHS builds pass. Browser print layout remains a deployment check.

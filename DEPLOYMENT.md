@@ -4,7 +4,7 @@ One repository, two independent installations of the same interface. No banner o
 
 | Target | Frontend on SiteGround | Separate PocketHost backend | Fresh-install data |
 | --- | --- | --- | --- |
-| `sample` | `sampleschool.cliffslunchclub.com` | Sample instance URL | Demo admin, John Smith with Jane and Joe, sample menus and teachers |
+| `sample` | `sampleschool.cliffslunchclub.com` | Sample instance URL | Demo admin, four families/11 students, sample menus/teachers and weekday orders |
 | `chs` | `chs.cliffslunchclub.com` | Different CHS instance URL | School record and schema only; no sample accounts or school data |
 
 School settings, accounts, students, orders and backups remain separate. Hosting keys, passwords and databases never go into GitHub. Do not overwrite the current CHS installation or DNS until its data and schema have been reviewed and backed up.
@@ -18,10 +18,10 @@ School settings, accounts, students, orders and backups remain separate. Hosting
 ```bash
 npm test
 npx --prefix frontend tsc --noEmit -p frontend/tsconfig.app.json
-npm run deploy:prepare -- --target sample --api-url https://YOUR-SAMPLE-INSTANCE.pockethost.io --release v1.0.0
+npm run deploy:prepare -- --target sample --api-url https://YOUR-SAMPLE-INSTANCE.pockethost.io --release v1.1.0
 ```
 
-Replace the URL and release identifier with the actual instance URL and source tag/commit. The build overrides the Mac's local API endpoint. It creates `.deploy/sample/v1.0.0/` with:
+Replace the URL and release identifier with the actual instance URL and source tag/commit. The build overrides the Mac's local API endpoint. It creates `.deploy/sample/v1.1.0/` with:
 
 - `siteground/`: static website, `.htaccess` for nested-route refreshes, and `release.json`.
 - `pockethost/pb_hooks/` and `pockethost/pb_migrations/`: backend source and all required helper modules.
@@ -33,16 +33,16 @@ No database, credentials, environment files, binaries or node_modules are packag
 5. Power off the sample instance in PocketHost before uploading the complete backend release. In SFTP open the correct sample instance directory, and upload the package's hooks and migrations into its `pb_hooks` and `pb_migrations` directories. Include helper `.js` files as well as `.pb.js`. Do not touch `pb_data`. Review starter hooks before removing any on a first install; on updates remove obsolete hooks required by the code change, while preserving migration history.
 6. Start/restart PocketHost and inspect logs for migration failures. Verify schema in its superuser dashboard. If uploaded migrations do not apply at startup, stop and resolve this with PocketHost; do not manually create collections with different IDs.
 7. Visit the backend `/api/release` and frontend `/release.json`. Both must show the same target, version and source digest. The frontend manifest must name the correct backend URL. These manifests contain no credentials.
-8. Test on the actual HTTPS website: parent/admin login, Jane/Joe under John, student management, saving/changing meals, ordering days, separate audit logs, CSV workflow, labels and refresh of a nested route such as `/admin/audit`. PocketBase's default CORS permits cross-origin requests; if customized, allow the correct frontend origin and verify OPTIONS/auth calls.
+8. Test on the actual HTTPS website: parent/admin login, all four demo families and their 11 students, student management, saving/changing meals, ordering days, separate audit logs, CSV workflow, labels and refresh of a nested route such as `/admin/audit`. PocketBase's default CORS permits cross-origin requests; if customized, allow the correct frontend origin and verify OPTIONS/auth calls.
 
-Sample login: `parent@example.test` or `admin@example.test`; password `LocalLunch2026!`; registration code `DEMO2026`. Mail stays suppressed on the sample. This is an editable demonstration; anyone given admin access can change its records. Share admin access separately and use invented records only. Adjust semester dates and ordering days in Settings before a demo because seed dates are fixed. Never copy CHS records into the sample.
+Sample parent logins: `parent@example.test`, `parent2@example.test`, `parent3@example.test`, `parent4@example.test`. Admin: `admin@example.test`; password `LocalLunch2026!`; registration code `DEMO2026`. Mail stays suppressed on the sample. This is an editable demonstration; anyone given admin access can change its records. Share admin access separately and use invented records only. Sample seed orders cover every Monday–Friday in the configured semester at installation. Existing orders are preserved; seed records are not parent audit events. Adjust semester dates and ordering days in Settings before a demo because seed dates are fixed; changing dates later does not automatically reseed orders. Never copy CHS records into the sample.
 
 ## Cherry Hill later
 
 Create its own PocketHost instance and prepare from the exact code version that passed on the sample:
 
 ```bash
-npm run deploy:prepare -- --target chs --api-url https://YOUR-CHS-INSTANCE.pockethost.io --release v1.0.0
+npm run deploy:prepare -- --target chs --api-url https://YOUR-CHS-INSTANCE.pockethost.io --release v1.1.0
 ```
 
 Sample-data guards are baked into the generated migrations: CHS gets no demo accounts even if a host environment variable is missing. Source migrations default to demo mode for `npm start`; `CLIFFS_SEED_DEMO=false npm start` creates a clean local template instead. Changing profiles does not remove data from existing databases because applied migrations do not rerun.

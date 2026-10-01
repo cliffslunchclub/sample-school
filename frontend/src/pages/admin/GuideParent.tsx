@@ -1,6 +1,11 @@
 import { Printer } from "lucide-react";
+import { APP_VERSION, GUIDE_UPDATED } from "../../lib/version";
+import { useSemester } from "../../lib/SemesterContext";
+import { orderingDayText } from "../../lib/semester";
 
 export default function GuideParent() {
+  const { orderingDays } = useSemester();
+  const schoolAddress = window.location.host;
   return (
     <div className="mx-auto max-w-3xl py-4">
 
@@ -26,17 +31,19 @@ export default function GuideParent() {
           </p>
         </div>
 
+        <p className="mb-6 text-xs text-ink-faint">Version {APP_VERSION} · Updated {GUIDE_UPDATED}</p>
+
         {/* Section 1 */}
         <Section number="1" title="Creating Your Account">
           <p className="mb-3 text-ink-soft">First time here? Here's how to get set up in under two minutes.</p>
           <Steps steps={[
-            "Visit chs.cliffslunchclub.com in your browser.",
+            `Visit ${schoolAddress} in your browser.`,
             'Click "Create an account" on the login page.',
-            "Enter your first name, last name, email address, and a password.",
+            "Enter your first name, last name, email address, a password of at least 8 characters, and the school verification code provided by your school.",
             'Click "Register" — you\'re in!',
             "Next time, just enter your email and password to log in.",
           ]} />
-          <Note>If you ever forget your password, click "Forgot password" on the login page and we'll send a reset link to your email.</Note>
+          <Note>If you ever forget your password, click "Forgot password" on the login page. Email delivery must be enabled for your school; contact the school if no reset email arrives.</Note>
         </Section>
 
         {/* Section 2 */}
@@ -70,13 +77,14 @@ export default function GuideParent() {
           <Steps steps={[
             'Click the "Meal Selection" tab.',
             "You'll see your children listed with dropdowns for Monday through Friday.",
-            "Pick a meal for each day from the menu options.",
+            "Review the choices for each child and each day. Previous-week meals may be suggested; they still need to be saved. Only meals available on that weekday appear.",
             'Click "Save selections" to confirm your choices.',
           ]} />
           <Highlight title="When can I order?">
             Your school sets the days when meal selections can be changed. Check Meal Selection for the current schedule.
             During this time you can choose meals for the following Monday through Friday.
-            Outside this window, selections are locked.
+            The schedule uses Eastern time. Selecting no ordering days closes parent ordering. Outside the window, selections are locked.
+            Current meal selection days: {orderingDayText(orderingDays)}.
           </Highlight>
           <Note>Changed your mind? You can update your selections as many times as you like while the window is open. Just come back and save again.</Note>
         </Section>
@@ -88,7 +96,7 @@ export default function GuideParent() {
             'Click the "My Orders" tab.',
             "You'll see all your confirmed meal selections, organized by Monday through Friday.",
             'Orders marked "Editable" can still be changed (the ordering window is open).',
-            'Orders marked "Locked" are confirmed and will be delivered.',
+            'Orders marked "Locked" cannot be changed here; contact the school for help.',
           ]} />
         </Section>
 
@@ -96,10 +104,13 @@ export default function GuideParent() {
         <Section number="6" title="Managing Your Account">
           <Steps steps={[
             'Click the "Account" tab.',
-            "Update your first name, last name, email, or password.",
-            'Click "Save changes" when done.',
+            'Update your first and last name, then click "Save profile".',
+            'To change your password, enter your current password, the new password and its confirmation, then click "Change password".',
+            "Your email address is displayed here; contact your school if it needs to change.",
           ]} />
         </Section>
+
+        <Note>Meal changes are recorded automatically for school administrators. Return to My Orders after saving to confirm the meals for each child.</Note>
 
         {/* Quick tips */}
         <div className="mt-8 rounded-xl bg-leaf-50 px-6 py-5">
@@ -107,14 +118,14 @@ export default function GuideParent() {
           <ul className="space-y-1.5 text-sm text-leaf-900">
             <li>• Review and save orders during the meal selection days shown by your school.</li>
             <li>• You can order for multiple children in one visit.</li>
-            <li>• Leaving a day blank means no lunch is ordered for that day.</li>
+            <li>• A blank choice does not create a new order or cancel an existing order. Contact the school to cancel a saved meal.</li>
             <li>• If you miss the window, contact the school office for help.</li>
           </ul>
         </div>
 
         {/* Footer */}
         <div className="mt-10 border-t border-line pt-5 text-center text-xs text-ink-faint">
-          Cliffs Lunch Club · chs.cliffslunchclub.com
+          Cliffs Lunch Club · {schoolAddress}
         </div>
       </div>
     </div>

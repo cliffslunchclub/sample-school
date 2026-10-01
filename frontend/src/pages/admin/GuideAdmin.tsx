@@ -1,6 +1,11 @@
 import { Printer } from "lucide-react";
+import { APP_VERSION, GUIDE_UPDATED } from "../../lib/version";
+import { useSemester } from "../../lib/SemesterContext";
+import { orderingDayText } from "../../lib/semester";
 
 export default function GuideAdmin() {
+  const { orderingDays } = useSemester();
+  const schoolAddress = window.location.host;
   return (
     <div className="mx-auto max-w-3xl py-4">
 
@@ -26,6 +31,8 @@ export default function GuideAdmin() {
           </p>
         </div>
 
+        <p className="mb-6 text-xs text-ink-faint">Version {APP_VERSION} · Updated {GUIDE_UPDATED}</p>
+
         {/* Section 1 */}
         <Section number="1" title="Dashboard">
           <p className="mb-3 text-sm text-ink-soft">
@@ -45,7 +52,7 @@ export default function GuideAdmin() {
           <p className="mb-3 text-sm text-ink-soft">View and manage every meal order in the system.</p>
           <ul className="mb-3 space-y-1 text-sm text-ink">
             <li><Dot /> Use the search bar to find orders by student name, parent name, or meal.</li>
-            <li><Dot /> Filter by <strong>day</strong> (Monday / Wednesday), delivery time, grade, teacher, or menu item.</li>
+            <li><Dot /> Filter by <strong>day</strong> (Monday through Friday), delivery time, grade, teacher, or menu item.</li>
             <li><Dot /> Click the <strong>pencil icon</strong> on any row to change a student's meal or delivery time.</li>
             <li><Dot /> Click <strong>"New Order"</strong> to manually create an order for a student.</li>
             <li><Dot /> Click <strong>"Export CSV"</strong> to download the current filtered list.</li>
@@ -92,7 +99,7 @@ export default function GuideAdmin() {
           <Steps steps={[
             'Go to "Menu" in the sidebar.',
             'Click "Add item" to create a new meal.',
-            "Enter the meal name, a short description, and which days it's served (Monday, Wednesday, or both).",
+            "Enter the meal name, a short description, and which days it's served (any combination of Monday through Friday).",
             'Toggle a meal "Inactive" to hide it from parents without deleting it.',
           ]} />
           <Note>Menu item names must match exactly when importing from CSV. Use the "Available menu items" panel on the Import page as a reference.</Note>
@@ -124,15 +131,15 @@ export default function GuideAdmin() {
           <p className="mb-3 text-sm text-ink-soft">Bulk-import student rosters and meal orders from a spreadsheet.</p>
           <Steps steps={[
             'Go to "Import Data" and click "Download template" to get the CSV format.',
-            "Fill in your spreadsheet: Student Name, Grade, Teacher, Delivery Time, Monday Meal, Wednesday Meal.",
-            "Leave Monday Meal or Wednesday Meal blank to skip that day for a student.",
+            "Fill in your spreadsheet: Student Name, Grade, Teacher, Delivery Time, Monday Meal, Tuesday Meal, Wednesday Meal, Thursday Meal, Friday Meal.",
+            "Leave any weekday meal blank to skip that day; existing orders are not cancelled by a blank cell.",
             'Save as a .csv file and click "Choose CSV file" to upload.',
             "Map your columns to the correct fields (the system usually detects them automatically).",
             'Click "Analyze data" to preview all rows before anything is saved.',
             "Resolve any conflicts (if a student already has an order, choose to overwrite or keep it).",
             'Click "Confirm Import" to save everything.',
           ]} />
-          <Note>The system imports into the next upcoming Monday through Friday automatically — no date selection needed.</Note>
+          <Note>The system targets the next Monday on or after today within the configured semester, with Tuesday–Friday in that same week. On Monday, the import can target today; parent ordering targets the following week. Review the analysis and semester dates before confirming.</Note>
         </Section>
 
         {/* Section 10 */}
@@ -140,26 +147,28 @@ export default function GuideAdmin() {
           <p className="mb-3 text-sm text-ink-soft">Configure the semester and ordering window.</p>
           <ul className="mb-3 space-y-1 text-sm text-ink">
             <li><Dot /> Set the <strong>semester start and end dates</strong> — only dates within this range are available for ordering.</li>
-            <li><Dot /> Set the <strong>ordering window</strong> — the days of the week when parents can make or change selections (default: Thursday–Friday).</li>
+            <li><Dot /> Choose <strong>Meal selection days</strong> — any days of the week when parents can make or change selections (default: Thursday and Friday). Save your settings. Selecting no days closes parent ordering.</li>
+            <li><Dot /> Ordering uses Eastern time and targets the following week's Monday–Friday within the semester.</li>
+            <li><Dot /> Current meal selection days: <strong>{orderingDayText(orderingDays)}</strong>.</li>
           </ul>
         </Section>
 
         {/* Section 11 */}
         <Section number="11" title="Admin Audit Logs">
           <p className="mb-3 text-sm text-ink-soft">
-            A full history of every change made in the system — who changed what, and when.
+            Review recorded administrative changes — who changed what, and when.
             Useful for tracking manual edits or troubleshooting unexpected changes.
           </p>
         </Section>
 
-        <Section number="14" title="Parent Audit Log">
-          <p className="text-sm text-ink-soft">Use Parent Audit Log to review parent meal selections and changes. Entries are recorded automatically, including the parent, student, previous and new meals, and timestamp. Entries cannot be edited.</p>
+        <Section number="12" title="Parent Audit Log">
+          <p className="text-sm text-ink-soft">Use Parent Audit Log to review parent meal selections and changes. Entries are recorded automatically, including the parent, student, previous and new meals, delivery time changes, lunch date and timestamp. Entries cannot be edited or deleted through the app. Unchanged saves do not add entries. History starts when this feature is installed; seeded sample orders are not parent actions.</p>
         </Section>
-        <Section number="12" title="Administrators">
-          <p className="text-sm text-ink-soft">Open Administrators and choose Create admin. Enter the staff member's name, email and a password of at least 12 characters. Share the login directly; the new account uses Admin Login.</p>
+        <Section number="13" title="Administrators">
+          <p className="text-sm text-ink-soft">Open Administrators and choose Create admin. Enter the staff member's name, email, a password of at least 12 characters and its confirmation, then choose Create account. The new admin belongs to this school. Share the login directly; the new account uses Admin Login.</p>
         </Section>
-        <Section number="13" title="Lunch Labels">
-          <p className="text-sm text-ink-soft">Choose the lunch date and generate student labels. Open Preview / Print / Save PDF, then print on 1 × 2⅝ inch, 30-per-sheet Letter stock at 100% with headers and footers off. Student labels use separate rows for menu or delivery time changes.</p>
+        <Section number="14" title="Lunch Labels">
+          <p className="text-sm text-ink-soft">Choose the lunch date and generate student labels. Open Preview / Print / Save PDF, then print on 1 × 2⅝ inch, 30-per-sheet Letter stock at 100% with headers and footers off. Labels contain the student name, meal, grade/teacher and lunch date/delivery time. Staff labels use one staff line. Menu and delivery time changes start new rows with no blank separator rows or forced page breaks. Chicken wrap types are separate. Labels contain students only; no menu summaries or summary checkbox.</p>
         </Section>
 
 
@@ -167,8 +176,8 @@ export default function GuideAdmin() {
         <div className="mt-8 rounded-xl bg-leaf-50 px-6 py-5 break-inside-avoid">
           <p className="mb-3 font-extrabold text-leaf-800">Quick reference</p>
           <div className="grid gap-1 text-sm text-leaf-900 sm:grid-cols-2">
-            <p>• Ordering window: <strong>Thu–Fri</strong> each week</p>
-            <p>• Orders target: <strong>next Mon & Wed</strong></p>
+            <p>• Ordering days: <strong>{orderingDayText(orderingDays)}</strong></p>
+            <p>• Parent orders target: <strong>next Monday–Friday</strong></p>
             <p>• CSV import: <strong>Import Data page</strong></p>
             <p>• Kitchen counts: <strong>Order Summary</strong></p>
             <p>• Change a meal: <strong>pencil icon in Orders</strong></p>
@@ -178,7 +187,7 @@ export default function GuideAdmin() {
 
         {/* Footer */}
         <div className="mt-10 border-t border-line pt-5 text-center text-xs text-ink-faint">
-          Cliffs Lunch Club · chs.cliffslunchclub.com · Admin Guide
+          Cliffs Lunch Club · {schoolAddress} · Admin Guide
         </div>
       </div>
     </div>

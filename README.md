@@ -2,6 +2,12 @@
 
 One codebase for separate school installations, with local development and deployment packages for SiteGround frontends and PocketHost backends. See [DEPLOYMENT.md](DEPLOYMENT.md) for sample-first releases and later Cherry Hill promotion. The interface is the same on both domains; databases and school settings stay separate.
 
+## Current version — 1.1.0 (October 1, 2026)
+
+This version supports Monday–Friday meals, configurable meal selection days, creating school admins, separate admin/parent audit logs and student-only lunch labels. Built-in Parent Guide and Admin Guide are updated for these workflows, use the current site address and ordering settings, and can be printed or saved as PDF.
+
+Deployment packages support the sample site on SiteGround + PocketHost and a separate Cherry Hill template. No hosting account or live domain is deployed by updating this repository. Test each release on the sample before promoting the same source version to Cherry Hill.
+
 ## Start on your Mac
 
 1. Install Node.js 24 LTS from https://nodejs.org (choose the macOS installer).
@@ -17,11 +23,22 @@ Stop with Control+C. Restart with `npm start`. It keeps your local changes.
 ## Demo logins
 
 Admin: admin@example.test
-Parent: parent@example.test
+Parent: parent@example.test (John Smith)
 Password for both: LocalLunch2026!
 School registration code: DEMO2026
 
-Use the app's Admin Login for the admin account. On a fresh checkout, PocketBase builds a new local database from schema migrations with demo accounts, parent John Smith and students Jane Smith and Joe Smith, sample teachers, menus, grades and delivery rules. Existing demo databases receive the same family update on startup, preserving Jane's original student record and meal selections. No database file or live school records are included in this repository. These public demo credentials are for sample data only, never a live school installation.
+| Parent | Login | Students |
+| --- | --- | --- |
+| John Smith | parent@example.test | Jane Smith, Joe Smith |
+| Emily Johnson | parent2@example.test | Ava Johnson, Oliver Johnson, Noah Johnson |
+| Michael Davis | parent3@example.test | Sophia Davis, Lucas Davis, Mia Davis |
+| Sarah Wilson | parent4@example.test | Ella Wilson, Ethan Wilson, Liam Wilson |
+
+All demo parent accounts use `LocalLunch2026!`. There are four demo families and 11 students. New sample/local installs seed a randomly selected available meal for every active demo student on each Monday–Friday date in the configured semester, with delivery times based on class rules. For the default September 14–November 11, 2026 semester, this is 43 service dates and 473 orders. Existing saved selections are preserved, and this migration runs once rather than rerandomizing on startup. Seed orders do not fabricate parent audit entries. Cherry Hill deployment packages disable all demo seeds.
+
+These guides are built into the admin sidebar as Parent Guide and Admin Guide; use their Print / Save as PDF button when distributing instructions.
+
+Use the app's Admin Login for the admin account. On a fresh checkout, PocketBase builds a new local database from schema migrations with demo accounts, four demo families and 11 students, sample teachers, menus, grades and delivery rules. Existing demo databases receive the same family update on startup, preserving Jane's original student record and meal selections. No database file or live school records are included in this repository. These public demo credentials are for sample data only, never a live school installation.
 
 You can open the ordering window in Admin Settings when testing. Semester dates and deadlines from the export may otherwise prevent ordering. Create sample orders through the parent interface and compare them with the admin summary/CSV export.
 
