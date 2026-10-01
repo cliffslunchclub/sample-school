@@ -167,23 +167,6 @@ export default function GuideAdmin() {
         <Section number="13" title="Administrators">
           <p className="text-sm text-ink-soft">Open Administrators and choose Create admin. Enter the staff member's name, email, a password of at least 12 characters and its confirmation, then choose Create account. The new admin belongs to this school. Share the login directly; the new account uses Admin Login.</p>
         </Section>
-        <Section number="14" title="Lunch Labels">
-          <p className="text-sm text-ink-soft">Choose the lunch date and generate student labels. Open Preview / Print / Save PDF, then print on 1 × 2⅝ inch, 30-per-sheet Letter stock at 100% with headers and footers off. Labels contain the student name, meal, grade/teacher and lunch date/delivery time. Staff labels use one staff line. Menu and delivery time changes start new rows with no blank separator rows or forced page breaks. Chicken wrap types are separate. Labels contain students only; no menu summaries or summary checkbox.</p>
-        </Section>
-
-
-        {/* Quick reference */}
-        <div className="mt-8 rounded-xl bg-leaf-50 px-6 py-5 break-inside-avoid">
-          <p className="mb-3 font-extrabold text-leaf-800">Quick reference</p>
-          <div className="grid gap-1 text-sm text-leaf-900 sm:grid-cols-2">
-            <p>• Ordering days: <strong>{orderingDayText(orderingDays)}</strong></p>
-            <p>• Parent orders target: <strong>next Monday–Friday</strong></p>
-            <p>• CSV import: <strong>Import Data page</strong></p>
-            <p>• Kitchen counts: <strong>Order Summary</strong></p>
-            <p>• Change a meal: <strong>pencil icon in Orders</strong></p>
-            <p>• Add a student: <strong>Students → Add student</strong></p>
-          </div>
-        </div>
 
         {/* Footer */}
         <div className="mt-10 border-t border-line pt-5 text-center text-xs text-ink-faint">

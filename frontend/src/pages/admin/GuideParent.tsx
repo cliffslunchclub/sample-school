@@ -1,10 +1,7 @@
 import { Printer } from "lucide-react";
 import { APP_VERSION, GUIDE_UPDATED } from "../../lib/version";
-import { useSemester } from "../../lib/SemesterContext";
-import { orderingDayText } from "../../lib/semester";
 
 export default function GuideParent() {
-  const { orderingDays } = useSemester();
   const schoolAddress = window.location.host;
   return (
     <div className="mx-auto max-w-3xl py-4">
@@ -35,9 +32,8 @@ export default function GuideParent() {
 
         {/* Section 1 */}
         <Section number="1" title="Creating Your Account">
-          <p className="mb-3 text-ink-soft">First time here? Here's how to get set up in under two minutes.</p>
+          <p className="mb-3 text-ink-soft">Here's how to get set up in under two minutes.</p>
           <Steps steps={[
-            `Visit ${schoolAddress} in your browser.`,
             'Click "Create an account" on the login page.',
             "Enter your first name, last name, email address, a password of at least 8 characters, and the school verification code provided by your school.",
             'Click "Register" — you\'re in!',
@@ -84,7 +80,6 @@ export default function GuideParent() {
             Your school sets the days when meal selections can be changed. Check Meal Selection for the current schedule.
             During this time you can choose meals for the following Monday through Friday.
             The schedule uses Eastern time. Selecting no ordering days closes parent ordering. Outside the window, selections are locked.
-            Current meal selection days: {orderingDayText(orderingDays)}.
           </Highlight>
           <Note>Changed your mind? You can update your selections as many times as you like while the window is open. Just come back and save again.</Note>
         </Section>
@@ -119,7 +114,7 @@ export default function GuideParent() {
             <li>• Review and save orders during the meal selection days shown by your school.</li>
             <li>• You can order for multiple children in one visit.</li>
             <li>• A blank choice does not create a new order or cancel an existing order. Contact the school to cancel a saved meal.</li>
-            <li>• If you miss the window, contact the school office for help.</li>
+            <li>• If you miss the window, contact the <strong>parent administrator</strong> for help.</li>
           </ul>
         </div>
 
