@@ -1,0 +1,1 @@
+{"name":"cliffs-school-local","private":true,"scripts":{"start":"node scripts/start.mjs"},"engines":{"node":">=22.12.0"}}

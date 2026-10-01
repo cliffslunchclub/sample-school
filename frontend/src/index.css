@@ -1,0 +1,94 @@
+@import url("https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900&display=swap");
+@import "tailwindcss";
+
+
+@theme {
+  --font-sans: "Nunito", ui-sans-serif, system-ui, sans-serif;
+
+  /* Dominant: warm cream */
+  --color-cream: oklch(0.985 0.012 95);
+  --color-cream-deep: oklch(0.96 0.018 92);
+
+  /* Ink */
+  --color-ink: oklch(0.29 0.03 155);
+  --color-ink-soft: oklch(0.48 0.025 155);
+  --color-ink-faint: oklch(0.62 0.02 155);
+
+  /* Secondary: garden green */
+  --color-leaf-50: oklch(0.97 0.03 150);
+  --color-leaf-100: oklch(0.93 0.06 150);
+  --color-leaf-200: oklch(0.87 0.09 152);
+  --color-leaf-300: oklch(0.78 0.12 152);
+  --color-leaf-400: oklch(0.68 0.14 153);
+  --color-leaf-500: oklch(0.58 0.14 154);
+  --color-leaf-600: oklch(0.5 0.13 155);
+  --color-leaf-700: oklch(0.42 0.11 156);
+  --color-leaf-800: oklch(0.35 0.09 157);
+
+  /* Accent: warm tomato */
+  --color-tomato-50: oklch(0.96 0.03 40);
+  --color-tomato-100: oklch(0.92 0.06 40);
+  --color-tomato-400: oklch(0.72 0.16 38);
+  --color-tomato-500: oklch(0.65 0.19 35);
+  --color-tomato-600: oklch(0.58 0.19 33);
+
+  /* Sun accent for highlights */
+  --color-sun-100: oklch(0.95 0.06 85);
+  --color-sun-400: oklch(0.82 0.14 82);
+  --color-sun-500: oklch(0.76 0.15 80);
+
+  /* Status */
+  --color-ok: oklch(0.55 0.13 155);
+  --color-warn: oklch(0.72 0.15 70);
+  --color-danger: oklch(0.55 0.19 27);
+
+  --color-line: oklch(0.9 0.015 150);
+  --color-surface: oklch(1 0 0);
+
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.75rem;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.4s ease-out both;
+}
+
+@keyframes pop-in {
+  0% { opacity: 0; transform: scale(0.96); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.animate-pop-in {
+  animation: pop-in 0.25s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Custom scrollbar for admin tables */
+.thin-scroll::-webkit-scrollbar { height: 10px; width: 10px; }
+.thin-scroll::-webkit-scrollbar-thumb { background: var(--color-line); border-radius: 999px; }
+.thin-scroll::-webkit-scrollbar-track { background: transparent; }
