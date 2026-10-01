@@ -6,6 +6,13 @@ export const SEMESTER_START = "2026-09-14";
 export const SEMESTER_END   = "2026-11-11";
 
 export const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"] as const;
+export const ORDERING_DAYS = [...WEEKDAYS, "Saturday", "Sunday"] as const;
+export type OrderingDay = typeof ORDERING_DAYS[number];
+export const DEFAULT_ORDERING_DAYS: OrderingDay[] = ["Thursday", "Friday"];
+export function orderingDayText(days: readonly OrderingDay[]): string {
+  const ordered = ORDERING_DAYS.filter(day => days.includes(day));
+  return ordered.length > 1 ? ordered.slice(0, -1).join(", ") + " and " + ordered.at(-1) : ordered[0] || "no days (ordering is closed)";
+}
 export type Weekday = typeof WEEKDAYS[number];
 export function weekdayOf(key: string): Weekday {
   return WEEKDAYS[new Date(key.slice(0, 10) + "T12:00:00Z").getUTCDay() - 1];
@@ -64,15 +71,15 @@ export interface OrderWindow {
 }
 
 /**
- * Parent ordering window: open Thursday–Friday, targeting next week's
+ * Parent ordering window: open on configured days, targeting next week's
  * Monday through Friday.
  */
-export function orderingWindow(now: Date = new Date()): OrderWindow {
+export function orderingWindow(now: Date = new Date(), days: readonly OrderingDay[] = DEFAULT_ORDERING_DAYS): OrderWindow {
   // Interpret ordering deadlines in the school timezone, regardless of the Mac timezone.
   const schoolNow = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
   const dow = schoolNow.getDay(); // 0 Sun … 6 Sat
-  const open = dow === 4 || dow === 5;
-  const daysUntilMon = (8 - dow) % 7; // Thu→4, Fri→3
+  const open = days.includes(ORDERING_DAYS[(dow + 6) % 7]);
+  const daysUntilMon = (8 - dow) % 7 || 7; // Thu→4, Fri→3
   const mon = new Date(schoolNow);
   mon.setHours(0, 0, 0, 0);
   mon.setDate(mon.getDate() + daysUntilMon);
@@ -86,14 +93,15 @@ export function editableLunchDates(
   now:   Date   = new Date(),
   start: string = SEMESTER_START,
   end:   string = SEMESTER_END,
+  days: readonly OrderingDay[] = DEFAULT_ORDERING_DAYS,
 ): LunchDate[] {
-  const w = orderingWindow(now);
+  const w = orderingWindow(now, days);
   if (!w.open) return [];
   return lunchDates(start, end).filter((d) => w.keys.includes(d.key));
 }
 
 /** Whether a given day key is currently editable by a parent. */
-export function isKeyEditable(key: string, now: Date = new Date()): boolean {
-  const w = orderingWindow(now);
+export function isKeyEditable(key: string, now: Date = new Date(), days: readonly OrderingDay[] = DEFAULT_ORDERING_DAYS): boolean {
+  const w = orderingWindow(now, days);
   return w.open && w.keys.includes(key);
 }

@@ -7,7 +7,10 @@ import { PageHeader } from "../../components/PageHeader";
 import { weekdayOf, isKeyEditable, keyOf } from "../../lib/semester";
 import type { MealSelection as Sel } from "../../lib/types";
 
+import { useSemester } from "../../lib/SemesterContext";
+
 export default function MyOrders() {
+  const { orderingDays } = useSemester();
   const { user } = useAuth();
   const [orders, setOrders] = useState<Sel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,7 +66,7 @@ export default function MyOrders() {
       ) : (
         <div className="space-y-5">
           {grouped.map(({ key, items }) => {
-            const editable = isKeyEditable(key);
+            const editable = isKeyEditable(key, new Date(), orderingDays);
             return (
               <Card key={key} className="overflow-hidden">
                 <div className="flex items-center justify-between border-b border-line bg-cream/60 px-5 py-3">

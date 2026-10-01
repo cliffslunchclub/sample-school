@@ -74,7 +74,7 @@ export default function GuideParent() {
             'Click "Save selections" to confirm your choices.',
           ]} />
           <Highlight title="When can I order?">
-            The ordering window opens every <strong>Thursday</strong> and closes at the end of <strong>Friday</strong>.
+            Your school sets the days when meal selections can be changed. Check Meal Selection for the current schedule.
             During this time you can choose meals for the following Monday through Friday.
             Outside this window, selections are locked.
           </Highlight>
@@ -105,7 +105,7 @@ export default function GuideParent() {
         <div className="mt-8 rounded-xl bg-leaf-50 px-6 py-5">
           <p className="mb-3 font-extrabold text-leaf-800">Quick tips</p>
           <ul className="space-y-1.5 text-sm text-leaf-900">
-            <li>• Order every Thursday or Friday — the window closes at the weekend.</li>
+            <li>• Review and save orders during the meal selection days shown by your school.</li>
             <li>• You can order for multiple children in one visit.</li>
             <li>• Leaving a day blank means no lunch is ordered for that day.</li>
             <li>• If you miss the window, contact the school office for help.</li>

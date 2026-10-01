@@ -4,6 +4,7 @@ import pb from "../../lib/pocketbase";
 import { Card, Button, Input, Field, Spinner, useToast } from "../../components/ui";
 import { PageHeader } from "../../components/PageHeader";
 import { useSemester } from "../../lib/SemesterContext";
+import { ORDERING_DAYS, DEFAULT_ORDERING_DAYS, orderingDayText, type OrderingDay } from "../../lib/semester";
 import type { Settings as SettingsType } from "../../lib/types";
 
 const ADJS = ["swift", "calm", "bold", "dark", "iron", "gold", "silver", "brave", "clear", "deep", "bright", "firm"];
@@ -27,6 +28,8 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [savingSem, setSavingSem] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [orderingDays, setOrderingDays] = useState<OrderingDay[]>(DEFAULT_ORDERING_DAYS);
+  const [savingDays, setSavingDays] = useState(false);
 
   // Purge state
   const [passphrase] = useState<string>(() => genPassphrase());
@@ -54,6 +57,7 @@ export default function Settings() {
       const rec = await pb.collection("settings").getFirstListItem<SettingsType>("id != ''", { requestKey: null });
       setSettings(rec);
       setCode(rec.verification_code);
+      setOrderingDays(rec.ordering_days ?? DEFAULT_ORDERING_DAYS);
       setSemStart(rec.semester_start ? rec.semester_start.slice(0, 10) : "");
       setSemEnd(rec.semester_end   ? rec.semester_end.slice(0, 10)   : "");
       await loadCounts();
@@ -98,6 +102,16 @@ export default function Settings() {
     } finally {
       setSavingSem(false);
     }
+  };
+
+  const saveOrderingDays = async (e: React.FormEvent) => {
+    e.preventDefault(); if (!settings) return;
+    setSavingDays(true);
+    try {
+      await pb.collection("settings").update(settings.id, {ordering_days:orderingDays});
+      semester.refresh(); toast("Meal selection days updated");
+    } catch {toast("Could not save meal selection days", "error");}
+    finally {setSavingDays(false);}
   };
 
   const toggleTarget = (key: keyof typeof purgeTargets) =>
@@ -226,14 +240,16 @@ export default function Settings() {
 
       <Card className="mb-5 p-5">
         <div className="mb-2 flex items-center gap-2 font-extrabold text-ink">
-          <CalendarRange className="h-5 w-5 text-leaf-600" /> Lunch schedule &amp; ordering window
+          <CalendarRange className="h-5 w-5 text-leaf-600" /> Meal selection days
         </div>
-        <p className="text-sm text-ink-soft">
-          Lunch is served every <strong>Monday through Friday</strong> for the semester. Parents can place
-          and change selections from <strong>Thursday 12:00&nbsp;AM until Friday 11:59&nbsp;PM</strong> for
-          the following week; outside that window their orders are read-only. Administrators can change any
-          order at any time.
-        </p>
+        <p className="mb-4 text-sm text-ink-soft">Choose when parents may place or change meals for the following week. Each selected day runs from 12:00 AM to 11:59 PM, Eastern time. Lunch service remains Monday through Friday. Administrators can edit orders at any time.</p>
+        <form onSubmit={saveOrderingDays} className="space-y-4">
+          <div className="flex flex-wrap gap-4">
+            {ORDERING_DAYS.map(day => <label key={day} className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={orderingDays.includes(day)} onChange={() => setOrderingDays(days => days.includes(day) ? days.filter(d => d !== day) : [...days, day])} />{day}</label>)}
+          </div>
+          <p className="text-sm text-ink-soft">{orderingDays.length ? `Selected days: ${orderingDayText(orderingDays)}.` : "No days selected: parent ordering will be closed."}</p>
+          <Button type="submit" loading={savingDays}>Save meal selection days</Button>
+        </form>
       </Card>
 
       {/* Danger Zone */}

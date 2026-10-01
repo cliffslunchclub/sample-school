@@ -4,7 +4,7 @@ import pb from "../../lib/pocketbase";
 import { useAuth } from "../../lib/auth";
 import { useToast, Button, Card, Select, EmptyState, Spinner, Badge } from "../../components/ui";
 import { PageHeader } from "../../components/PageHeader";
-import { weekdayOf, editableLunchDates, isoForKey, keyOf, orderingWindow } from "../../lib/semester";
+import { orderingDayText, weekdayOf, editableLunchDates, isoForKey, keyOf, orderingWindow } from "../../lib/semester";
 import { useSemester } from "../../lib/SemesterContext";
 import type { Student, MenuItem, DeliveryRule, MealSelection as Sel } from "../../lib/types";
 
@@ -20,9 +20,11 @@ export default function MealSelection() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const { start, end } = useSemester();
-  const dates = useMemo(() => editableLunchDates(new Date(), start, end), [start, end]);
-  const windowOpen = orderingWindow().open && dates.length > 0;
+  const { start, end, orderingDays, loading: calendarLoading } = useSemester();
+  const allowedDaysText = orderingDayText(orderingDays);
+  const todayKey = new Intl.DateTimeFormat("en-CA", {timeZone:"America/New_York"}).format(new Date());
+  const dates = useMemo(() => editableLunchDates(new Date(), start, end, orderingDays), [start, end, orderingDays, todayKey]);
+  const windowOpen = orderingWindow(new Date(), orderingDays).open && dates.length > 0;
   const selKey = (studentId: string, dayKey: string) => `${studentId}_${dayKey}`;
 
   const load = async () => {
@@ -77,9 +79,9 @@ export default function MealSelection() {
   };
 
   useEffect(() => {
-    load();
+    if (!calendarLoading) void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [start, end, orderingDays, calendarLoading, todayKey]);
 
   const menuById = useMemo(() => Object.fromEntries(menu.map((m) => [m.id, m])), [menu]);
   const existingByKey = useMemo(() => {
@@ -137,7 +139,7 @@ export default function MealSelection() {
     }
   };
 
-  if (loading) return <Spinner label="Loading meals…" />;
+  if (loading || calendarLoading) return <Spinner label="Loading meals…" />;
 
   if (students.length === 0) {
     return (
@@ -158,7 +160,7 @@ export default function MealSelection() {
     <div className="pb-4">
       <PageHeader
         title="Meal Selection"
-        desc={windowOpen ? "Pick a meal for each child for next week" : "Ordering opens Thursday"}
+        desc={windowOpen ? "Pick a meal for each child for next week" : "Ordering is currently closed"}
         action={
           windowOpen ? (
             <Button onClick={saveAll} size="lg" loading={saving}>
@@ -174,13 +176,13 @@ export default function MealSelection() {
             <div className="flex items-start gap-2.5 text-sm font-bold text-[oklch(0.42_0.1_60)]">
               <Lock className="mt-0.5 h-5 w-5 shrink-0" />
               <span>
-                Ordering is open <strong>Thursday and Friday</strong> each week for the following Monday through Friday. Previous selections are suggested — come back Thursday to review and save.
+                {orderingDays.length ? <>Ordering is open on <strong>{allowedDaysText}</strong> each week for the following Monday through Friday. Previous selections are suggested — review and save during the next ordering window.</> : <>Parent ordering is currently closed by your school. You can still review your existing orders.</>}
               </span>
             </div>
           </Card>
 
           {upcoming.length === 0 ? (
-            <EmptyState icon={<CalendarDays className="h-7 w-7" />} title="No meals selected yet" desc="Come back Thursday to place next week's order." />
+            <EmptyState icon={<CalendarDays className="h-7 w-7" />} title="No meals selected yet" desc={orderingDays.length ? `Place next week's order on ${allowedDaysText}.` : "Your school has closed parent ordering."} />
           ) : (
             <Card className="overflow-hidden">
               <div className="divide-y divide-line">
@@ -246,7 +248,7 @@ export default function MealSelection() {
                         </div>
                         <div className="sm:w-72">
                           <p className="mb-1.5 text-xs text-ink-faint">
-                            Menu changes can only be applied on Thursdays and Fridays for the upcoming week.
+                            Menu changes can be made on {allowedDaysText} for the upcoming week.
                           </p>
                           <Select value={current} onChange={(e) => setDraftValue(s.id, day.key, e.target.value)}>
                             <option value="">Select Meal…</option>

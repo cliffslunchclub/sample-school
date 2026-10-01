@@ -12,7 +12,6 @@ export default function Labels() {
   const days=useMemo(()=>lunchDates(start,end),[start,end]);
   const [key,setKey]=useState("");
   const date=key || days.find(d=>d.key>=new Date().toISOString().slice(0,10))?.key || days[0]?.key || "";
-  const [summaries,setSummaries]=useState(true);
   const [busy,setBusy]=useState(false);
   const [sheet,setSheet]=useState<LabelSheet|null>(null);
   const toast=useToast();
@@ -24,7 +23,7 @@ export default function Labels() {
         pb.collection("menu_items").getFullList<MenuItem>({sort:"name",requestKey:null}),
         pb.collection("delivery_time_slots").getFullList<DeliveryTime>({requestKey:null}),
       ]);
-      const result=buildLabels(orders,menu,times,date,summaries);
+      const result=buildLabels(orders,menu,times,date);
       if(!result.studentCount){toast("No orders for this date","error");return;}
       setSheet(result);
     }catch{toast("Could not load labels. Please try again.","error");}
@@ -38,13 +37,12 @@ export default function Labels() {
     setTimeout(()=>URL.revokeObjectURL(url),60000);
   };
   return <div>
-    <PageHeader title="Lunch Labels" desc="Print CHS-style student and menu summary labels" />
+    <PageHeader title="Lunch Labels" desc="Print CHS-style student labels" />
     <Card className="space-y-4 p-5">
       <Field label="Lunch date" htmlFor="label-date"><Input id="label-date" type="date" value={date} onChange={e=>{setKey(e.target.value);setSheet(null);}} /></Field>
-      <label className="flex gap-2 text-sm font-bold"><input type="checkbox" checked={summaries} onChange={e=>{setSummaries(e.target.checked);setSheet(null);}} /> Include two sets of menu summaries (extra sliders and nuggets copies)</label>
-      <p className="text-sm text-ink-soft">1 × 2⅝ inch labels · 30 per Letter sheet. New rows for menu or time changes, with no blank separator rows. Chicken wraps stay together.</p>
+      <p className="text-sm text-ink-soft">1 × 2⅝ inch labels · 30 per Letter sheet</p>
       <Button onClick={generate} loading={busy} disabled={!date}>Generate labels</Button>
     </Card>
-    {sheet && <Card className="mt-4 space-y-3 p-5"><p className="font-bold">{sheet.studentCount} student labels · {sheet.summaryCount} summary labels · {Math.ceil(sheet.slots.length/30)} sheets</p><Button onClick={preview}>Preview / Print / Save PDF</Button><p className="text-sm text-ink-soft">In the print dialog, choose US Letter and Actual size / 100%, and turn off headers and footers.</p></Card>}
+    {sheet && <Card className="mt-4 space-y-3 p-5"><p className="font-bold">{sheet.studentCount} student labels · {Math.ceil(sheet.slots.length/30)} sheets</p><Button onClick={preview}>Preview / Print / Save PDF</Button><p className="text-sm text-ink-soft">In the print dialog, choose US Letter and Actual size / 100%, and turn off headers and footers.</p></Card>}
   </div>;
 }

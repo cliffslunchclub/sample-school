@@ -41,6 +41,6 @@ routerAdd("GET", "/api/school-calendar", (e) => {
   const school = e.auth.getString("school")
   try {
     const settings = $app.findFirstRecordByFilter("settings", "school = {:school}", {school:school})
-    return e.json(200, {id:settings.id, semester_start:settings.getString("semester_start"), semester_end:settings.getString("semester_end")})
+    return e.json(200, {id:settings.id, semester_start:settings.getString("semester_start"), semester_end:settings.getString("semester_end"), ordering_days:settings.getStringSlice("ordering_days")})
   } catch (err) {return e.json(404, {message:"School calendar not found."})}
 })

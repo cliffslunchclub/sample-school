@@ -91,6 +91,7 @@ const App = () => (
              <Route path="/admin/import" element={<ImportData />} />
              <Route path="/admin/settings" element={<Settings />} />
              <Route path="/admin/audit" element={<AuditLog />} />
+             <Route path="/admin/parent-audit" element={<AuditLog parent />} />
              <Route path="/admin/guide/parent" element={<GuideParent />} />
              <Route path="/admin/guide/admin" element={<GuideAdmin />} />
           </Route>

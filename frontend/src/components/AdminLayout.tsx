@@ -22,8 +22,10 @@ const nav = [
   { to: "/admin/delivery-times", label: "Delivery Times",  icon: Clock },
   { to: "/admin/import",         label: "Import Data",     icon: FileUp },
   { to: "/admin/settings",       label: "Settings",        icon: SettingsIcon },
-  { to: "/admin/audit",          label: "Audit Log",       icon: History },
+  { to: "/admin/audit",          label: "Admin Audit Logs",       icon: History },
 ];
+
+nav.push({ to: "/admin/parent-audit", label: "Parent Audit Log", icon: History });
 
 const guides = [
   { to: "/admin/guide/parent", label: "Parent Guide" },

@@ -1,4 +1,4 @@
-import type { Weekday } from "./semester";
+import type { Weekday, OrderingDay } from "./semester";
 export type Role = "parent" | "admin";
 
 export interface UserRecord {
@@ -88,6 +88,14 @@ export interface MealSelection {
 }
 
 export interface AuditEntry {
+  actor_name?: string;
+  actor_email?: string;
+  student_name?: string;
+  previous_meal_name?: string;
+  new_meal_name?: string;
+  previous_delivery_time?: string;
+  new_delivery_time?: string;
+  previous_lunch_date?: string;
   id: string;
   student: string;
   lunch_date: string;
@@ -102,10 +110,12 @@ export interface AuditEntry {
     previous_meal?: MenuItem;
     new_meal?: MenuItem;
     admin?: UserRecord;
+    actor?: UserRecord;
   };
 }
 
 export interface Settings {
+  ordering_days: OrderingDay[];
   id: string;
   verification_code: string;
   school: string;

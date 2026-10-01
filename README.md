@@ -55,8 +55,8 @@ PocketBase is pinned to 0.28.4 as a compatibility baseline for the export. The Z
 ## New admin features
 
 - **Administrators**: create another school admin with a name, email and password of at least 12 characters. Parents cannot use the creation endpoint or promote their accounts.
-- **Lunch Labels**: choose an exact lunch date, generate student labels and optionally two menu summary sets, then preview, print or use the browser's Save as PDF. CHS formatting uses Letter 30-label stock (1 × 2⅝ inches), four lines, bold names, menu/time row breaks with no blank separator rows, grouped chicken wraps, and extra cheeseburger slider/chicken nugget summaries. The weekday appears bold and right-aligned on summaries.
-- **Monday–Friday**: parent menus, selections, admin filters/overrides, summaries and CSV imports support five weekdays. The migration adds Tuesday, Thursday and Friday to existing menu availability; adjust each item in Menu if needed. Ordering still opens Thursday and Friday for the following week, using America/New_York.
+- **Lunch Labels**: choose an exact lunch date and generate student labels only. Print or use the browser's Save as PDF. Label stock is 1 × 2⅝ inch, 30 per Letter sheet. Menu and delivery time changes start separate rows; chicken wrap types are separate menu sections.
+- **Monday–Friday**: parent menus, selections, admin filters/overrides, summaries and CSV imports support five weekdays. The migration adds Tuesday, Thursday and Friday to existing menu availability; adjust each item in Menu if needed. Admins choose the allowed meal selection days in Settings (Thursday and Friday by default), using America/New_York. Select no days to close parent ordering. Each selected day allows orders for the following week's Monday–Friday, including next week when Monday itself is selected.
 
 ## Updating a downloaded copy
 
@@ -65,3 +65,5 @@ Stop the old app with Control+C and keep its folder as a backup. Download Code �
 ## Checks
 
 After frontend dependencies are installed, run `npm test` from the project root for schedule, import and label regressions. In `frontend`, run `npx tsc --noEmit -p tsconfig.app.json` and `npm run build`. Print one plain-paper label sheet at 100% with browser headers and footers disabled before using label stock.
+
+- **Audit logs**: Admin Audit Logs retains the existing administrative history. Parent Audit Log is recorded automatically on the server for new parent meal selections and changes, with immutable snapshots of parent, student, meal and delivery time. Parent history begins when this update is installed; past changes cannot be reconstructed.

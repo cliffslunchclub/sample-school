@@ -13,26 +13,28 @@ const window=orderingWindow(new Date('2026-10-01T18:00:00Z'));
 assert.equal(window.open,true);assert.deepEqual(window.keys,['2026-10-05','2026-10-06','2026-10-07','2026-10-08','2026-10-09']);
 assert.equal(orderingWindow(new Date('2026-10-03T04:00:00Z')).open,false);
 assert.equal(orderingWindow(new Date('2026-10-02T03:59:59Z')).open,true);
+assert.equal(orderingWindow(new Date('2026-10-01T18:00:00Z'),['Monday']).open,false);
+assert.equal(orderingWindow(new Date('2026-10-05T18:00:00Z'),['Monday']).open,true);
+assert.equal(orderingWindow(new Date('2026-10-05T18:00:00Z'),['Monday']).keys[0],'2026-10-12');
+assert.equal(orderingWindow(new Date('2026-10-04T18:00:00Z'),['Sunday']).keys[0],'2026-10-05');
+assert.equal(orderingWindow(new Date('2026-10-01T18:00:00Z'),[]).open,false);
 const key='2026-10-05';
 const names=['Cheeseburger Sliders + TT','Chicken Nuggets + TT','Grilled Chicken Caesar Wrap','Grilled Chicken Wrap (Plain)',...Array.from({length:11},(_,i)=>`Meal ${i+1}`)];
 const menu=names.map((name,i)=>({id:String(i),name,active:true,days:[...WEEKDAYS],description:''}));
 const times=[{id:'early',label:'10:45',active:true},{id:'late',label:'11:45',active:true}];
 const order=(id,item,time='early',grade='Grade 3')=>({id,student:id,menu_item:String(item),delivery_time:time,lunch_date:key+'T12:00:00Z',expand:{student:{name:'Student '+id,expand:{grade:{name:grade},teacher:{name:'Teacher'}}}}});
 const result=buildLabels([order('a',0),order('b',0,'late'),order('c',2),order('d',3),order('e',1,'early','Faculty/Staff')],menu,times,key);
-assert.equal(result.studentCount,5);assert.equal(result.summaryCount,34);
+assert.equal(result.studentCount,5);assert.equal(result.slots.filter(Boolean).length,5);
 const labels=result.slots.filter(Boolean);
 assert.equal(labels[0].lines[0].text,'Student a');assert.equal(labels[0].lines[0].bold,true);assert.equal(labels[0].lines[2].text,'3 - Teacher');
 assert.equal(result.slots[3].lines[0].text,'Student b'); // time change starts next row, with no empty separator row
 assert.ok(labels.find(l=>l.lines[0].text==='Student e').lines.some(l=>l.text==='FACULTY/STAFF 10:45'));
-const wraps=result.slots.flatMap((l,i)=>l?.lines[1]?.text.includes('Wrap')?[i]:[]);assert.equal(wraps[1]-wraps[0],1);
-assert.equal(result.slots.findIndex(l=>l?.kind==='summary'),30);
-assert.equal(labels.filter(l=>l.kind==='summary'&&l.lines[0].text===names[0]).length,4);
-assert.ok(labels.filter(l=>l.kind==='summary').every(l=>l.lines.at(-1).text==='MONDAY'&&l.lines.at(-1).right&&l.lines.at(-1).bold));
-const many=buildLabels(Array.from({length:29},(_,i)=>order(String(i),0)).concat(order('new',1)),menu,times,key,false);
+const wraps=result.slots.flatMap((l,i)=>l?.lines[1]?.text.includes('Wrap')?[i]:[]);assert.equal(wraps[1]-wraps[0],3);
+const many=buildLabels(Array.from({length:29},(_,i)=>order(String(i),0)).concat(order('new',1)),menu,times,key);
 assert.equal(many.slots[30].lines[0].text,'Student new');assert.equal(many.slots.length,31); // naturally cross sheet at a row boundary
 assert.equal(buildLabels([],menu,times,key).slots.length,0);
-assert.ok(labelsHtml(buildLabels([order('<script>',0)],menu,times,key,false),'test').includes('&lt;script&gt;'));
-console.log('PASS: five-day calendar and timezone boundaries; label row/page boundaries, wrap grouping, staff labels, 34 summaries, escaping and empty dates');
+assert.ok(labelsHtml(buildLabels([order('<script>',0)],menu,times,key),'test').includes('&lt;script&gt;'));
+console.log('PASS: five-day calendar and timezone boundaries; label row/page boundaries, separate wrap rows, staff labels, no summaries, escaping and empty dates');
 
 // Import regression: each added day matches, resolves conflicts, and writes the correct date.
 const csvUri=uri(transpile('../frontend/src/lib/csv.ts'));

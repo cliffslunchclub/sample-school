@@ -145,18 +145,21 @@ export default function GuideAdmin() {
         </Section>
 
         {/* Section 11 */}
-        <Section number="11" title="Audit Log">
+        <Section number="11" title="Admin Audit Logs">
           <p className="mb-3 text-sm text-ink-soft">
             A full history of every change made in the system — who changed what, and when.
             Useful for tracking manual edits or troubleshooting unexpected changes.
           </p>
         </Section>
 
+        <Section number="14" title="Parent Audit Log">
+          <p className="text-sm text-ink-soft">Use Parent Audit Log to review parent meal selections and changes. Entries are recorded automatically, including the parent, student, previous and new meals, and timestamp. Entries cannot be edited.</p>
+        </Section>
         <Section number="12" title="Administrators">
           <p className="text-sm text-ink-soft">Open Administrators and choose Create admin. Enter the staff member's name, email and a password of at least 12 characters. Share the login directly; the new account uses Admin Login.</p>
         </Section>
         <Section number="13" title="Lunch Labels">
-          <p className="text-sm text-ink-soft">Choose the lunch date, include summary labels if needed, and generate labels. Open Preview / Print / Save PDF, then print on 1 × 2⅝ inch, 30-per-sheet Letter stock at 100% with headers and footers off. Student labels use new rows for menu or time changes, with no blank separator rows; chicken wraps stay together. Two menu summary sets include extra cheeseburger slider and chicken nugget copies.</p>
+          <p className="text-sm text-ink-soft">Choose the lunch date and generate student labels. Open Preview / Print / Save PDF, then print on 1 × 2⅝ inch, 30-per-sheet Letter stock at 100% with headers and footers off. Student labels use separate rows for menu or delivery time changes.</p>
         </Section>
 
 
