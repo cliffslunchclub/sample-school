@@ -21,7 +21,7 @@ Parent: parent@example.test
 Password for both: LocalLunch2026!
 School registration code: DEMO2026
 
-Use the app's Admin Login for the admin account. On a fresh checkout, PocketBase builds a new local database from schema migrations with demo accounts, a Demo Student, sample teachers, menus, grades and delivery rules. No database file or live school records are included in this repository. These public demo credentials are for loopback-only local testing, never production.
+Use the app's Admin Login for the admin account. On a fresh checkout, PocketBase builds a new local database from schema migrations with demo accounts, parent John Smith and students Jane Smith and Joe Smith, sample teachers, menus, grades and delivery rules. Existing demo databases receive the same family update on startup, preserving Jane's original student record and meal selections. No database file or live school records are included in this repository. These public demo credentials are for loopback-only local testing, never production.
 
 You can open the ordering window in Admin Settings when testing. Semester dates and deadlines from the export may otherwise prevent ordering. Create sample orders through the parent interface and compare them with the admin summary/CSV export.
 
