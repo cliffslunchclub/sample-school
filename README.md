@@ -1,12 +1,12 @@
 # Cliffs school app
 
-One codebase for separate school installations, with local development and deployment packages for SiteGround frontends and PocketHost backends. See [DEPLOYMENT.md](DEPLOYMENT.md) for sample-first releases and later Cherry Hill promotion. The interface is the same on both domains; databases and school settings stay separate.
+One codebase for separate school installations, with local development and deployment packages for SiteGround frontends and PocketHost backends. See [DEPLOYMENT.md](DEPLOYMENT.md) for sample-first releases and later REDACTED SCHOOL promotion. The interface is the same on both domains; databases and school settings stay separate.
 
 ## Current version — 1.1.0 (October 1, 2026)
 
 This version supports Monday–Friday meals, configurable meal selection days, creating school admins, separate admin/parent audit logs and student-only lunch labels. Built-in Parent Guide and Admin Guide are updated for these workflows, use the current site address and ordering settings, and can be printed or saved as PDF.
 
-Deployment packages support the sample site on SiteGround + PocketHost and a separate Cherry Hill template. No hosting account or live domain is deployed by updating this repository. Test each release on the sample before promoting the same source version to Cherry Hill.
+Deployment packages support the sample site on SiteGround + PocketHost and a separate REDACTED SCHOOL template. No hosting account or live domain is deployed by updating this repository. Test each release on the sample before promoting the same source version to REDACTED SCHOOL.
 
 ## Start on your Mac
 
@@ -34,7 +34,7 @@ School registration code: DEMO2026
 | Michael Davis | parent3@example.test | Sophia Davis, Lucas Davis, Mia Davis |
 | Sarah Wilson | parent4@example.test | Ella Wilson, Ethan Wilson, Liam Wilson |
 
-All demo parent accounts use `LocalLunch2026!`. There are four demo families and 11 students. New sample/local installs seed a randomly selected available meal for every active demo student on each Monday–Friday date in the configured semester, with delivery times based on class rules. For the default September 14–November 11, 2026 semester, this is 43 service dates and 473 orders. Existing saved selections are preserved, and this migration runs once rather than rerandomizing on startup. Seed orders do not fabricate parent audit entries. Cherry Hill deployment packages disable all demo seeds.
+All demo parent accounts use `LocalLunch2026!`. There are four demo families and 11 students. New sample/local installs seed a randomly selected available meal for every active demo student on each Monday–Friday date in the configured semester, with delivery times based on class rules. For the default September 14–November 11, 2026 semester, this is 43 service dates and 473 orders. Existing saved selections are preserved, and this migration runs once rather than rerandomizing on startup. Seed orders do not fabricate parent audit entries. REDACTED SCHOOL deployment packages disable all demo seeds.
 
 These guides are built into the admin sidebar as Parent Guide and Admin Guide; use their Print / Save as PDF button when distributing instructions.
 
@@ -68,12 +68,6 @@ Brand text and API endpoint: frontend/.env.local
 Each new school should use the same source release with its own backend database, environment configuration and domain. Deployment packaging supports sample and CHS profiles; hosting uploads remain manual. Use a separate folder for independent local school tests; stop one before starting another because they use the same ports.
 
 PocketBase is pinned to 0.28.4 as a compatibility baseline for the export. The ZIP does not identify the original backend version. Validate migrations, authorization, backups and a supported PocketBase upgrade before production. Never use the demo credentials for real school records. No AWS resources or live DNS were changed.
-
-## New admin features
-
-- **Administrators**: create another school admin with a name, email and password of at least 12 characters. Parents cannot use the creation endpoint or promote their accounts.
-- **Lunch Labels**: choose an exact lunch date and generate student labels only. Print or use the browser's Save as PDF. Label stock is 1 × 2⅝ inch, 30 per Letter sheet. Menu and delivery time changes start separate rows; chicken wrap types are separate menu sections.
-- **Monday–Friday**: parent menus, selections, admin filters/overrides, summaries and CSV imports support five weekdays. The migration adds Tuesday, Thursday and Friday to existing menu availability; adjust each item in Menu if needed. Admins choose the allowed meal selection days in Settings (Thursday and Friday by default), using America/New_York. Select no days to close parent ordering. Each selected day allows orders for the following week's Monday–Friday, including next week when Monday itself is selected.
 
 ## Updating a downloaded copy
 
