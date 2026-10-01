@@ -20,3 +20,17 @@ Latest update verified:
 - Fresh and existing demo database migrations pass. Existing admin audit history is retained.
 
 Parent audit history starts at installation of this update; historical parent changes cannot be reconstructed.
+
+
+Deployment preparation verified (2026-10-01):
+
+- Sample and CHS static builds embed separate HTTPS backend URLs and no local backend URL; both include SPA fallback rules and matching source digests.
+- Packages exclude databases, environment files, node_modules and runtime binaries.
+- Fresh sample migrations create John, Jane and Joe; fresh CHS migrations create schema/school only, with no demo accounts or data. Repeat startup does not duplicate seeds.
+- Applying guarded migrations to an existing database preserves users, students, meals and settings.
+- Both packaged backends start on UTC hosts and expose matching release metadata.
+- Eastern ordering calendar covers midnight and spring/fall DST transitions without depending on host timezone.
+- Hosted-style sample API checks pass: configurable ordering days, closed-day enforcement, parent audit create/update/time snapshots, no-op suppression, admin/parent separation and immutable restricted logs.
+- Regression tests, TypeScript check and both production builds pass.
+
+No SiteGround/PocketHost account, DNS or live installation was changed. Actual provider version support, hosted migration startup, browser workflows and label alignment remain deployment checks.

@@ -1,6 +1,6 @@
-# Cliffs school app — local starter
+# Cliffs school app
 
-This adapts the existing CHS React/PocketBase app for local development. It is the first step toward the shared-codebase, separate-school deployment plan, not a completed redesign or production AWS deployment.
+One codebase for separate school installations, with local development and deployment packages for SiteGround frontends and PocketHost backends. See [DEPLOYMENT.md](DEPLOYMENT.md) for sample-first releases and later Cherry Hill promotion. The interface is the same on both domains; databases and school settings stay separate.
 
 ## Start on your Mac
 
@@ -21,11 +21,11 @@ Parent: parent@example.test
 Password for both: LocalLunch2026!
 School registration code: DEMO2026
 
-Use the app's Admin Login for the admin account. On a fresh checkout, PocketBase builds a new local database from schema migrations with demo accounts, parent John Smith and students Jane Smith and Joe Smith, sample teachers, menus, grades and delivery rules. Existing demo databases receive the same family update on startup, preserving Jane's original student record and meal selections. No database file or live school records are included in this repository. These public demo credentials are for loopback-only local testing, never production.
+Use the app's Admin Login for the admin account. On a fresh checkout, PocketBase builds a new local database from schema migrations with demo accounts, parent John Smith and students Jane Smith and Joe Smith, sample teachers, menus, grades and delivery rules. Existing demo databases receive the same family update on startup, preserving Jane's original student record and meal selections. No database file or live school records are included in this repository. These public demo credentials are for sample data only, never a live school installation.
 
 You can open the ordering window in Admin Settings when testing. Semester dates and deadlines from the export may otherwise prevent ordering. Create sample orders through the parent interface and compare them with the admin summary/CSV export.
 
-Outgoing email is suppressed by pb_hooks/local_email.pb.js. Password-reset/email delivery flows cannot be fully tested in this package. Remove that hook and configure email only in a separate deployment when ready.
+Outgoing email is suppressed by pb_hooks/local_email.pb.js. Password-reset/email delivery flows cannot be fully tested in this package. The sample deployment keeps this hook; the CHS package omits it and requires SMTP setup.
 
 ## Local addresses
 
@@ -48,9 +48,9 @@ Brand text and API endpoint: frontend/.env.local
 
 `cd frontend` then `npm run build` builds the frontend. Run from the project root again for `npm start`.
 
-Each new school should use the same source release with its own backend database, environment configuration and domain. This starter does not yet automate new-school provisioning or AWS deployment. Use a separate folder for independent local school tests; stop one before starting another because they use the same ports.
+Each new school should use the same source release with its own backend database, environment configuration and domain. Deployment packaging supports sample and CHS profiles; hosting uploads remain manual. Use a separate folder for independent local school tests; stop one before starting another because they use the same ports.
 
-PocketBase is pinned to 0.28.4 as a compatibility baseline for the export. The ZIP does not identify the original backend version. Validate migrations, authorization, backups and a supported PocketBase upgrade before production. Never publish the demo credentials. No AWS resources or live DNS were changed.
+PocketBase is pinned to 0.28.4 as a compatibility baseline for the export. The ZIP does not identify the original backend version. Validate migrations, authorization, backups and a supported PocketBase upgrade before production. Never use the demo credentials for real school records. No AWS resources or live DNS were changed.
 
 ## New admin features
 

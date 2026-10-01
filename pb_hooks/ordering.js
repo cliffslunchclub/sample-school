@@ -6,13 +6,11 @@ module.exports = {
     const app=e.app
     const settings=app.findFirstRecordByFilter("settings", "school = {:school}", {school:e.auth.getString("school")})
     const selected=settings.getStringSlice("ordering_days")
-    const now=new Date()
     const names=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]
-    const dow=now.getDay()
+    const calendar=require(__hooks + "/school-calendar.js").orderingCalendar(new Date())
+    const dow=calendar.day
     if (selected.indexOf(names[dow]) === -1) throw new BadRequestError("Ordering is currently closed. Check the school's meal selection days.")
-    const monday=new Date(now);monday.setHours(0,0,0,0);monday.setDate(monday.getDate()+((8-dow)%7 || 7))
-    const fmt=(d)=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")
-    const keys=[0,1,2,3,4].map(i=>{const d=new Date(monday);d.setDate(d.getDate()+i);return fmt(d)})
+    const keys=calendar.keys
     const key=e.record.getString("lunch_date").slice(0,10)
     if (keys.indexOf(key)===-1) throw new BadRequestError("Parents can only order for the following week's Monday through Friday.")
     const start=settings.getString("semester_start").slice(0,10),end=settings.getString("semester_end").slice(0,10)

@@ -1,4 +1,5 @@
 migrate((app) => {
+  if (!($os.getenv("CLIFFS_SEED_DEMO") !== "false")) return;
   const school = app.findFirstRecordByFilter("schools", "id != ''");
   const users = app.findCollectionByNameOrId("users");
   for (const role of ["admin", "parent"]) {

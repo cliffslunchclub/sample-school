@@ -1,4 +1,5 @@
 migrate((app) => {
+  if (!($os.getenv("CLIFFS_SEED_DEMO") !== "false")) return;
   let parent;
   try {
     parent = app.findFirstRecordByFilter("users", "email = 'parent@example.test' && role = 'parent'");

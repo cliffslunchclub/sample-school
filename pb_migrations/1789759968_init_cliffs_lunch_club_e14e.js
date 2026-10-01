@@ -23,7 +23,7 @@ migrate((app) => {
   const schoolsId = schools.id
 
   const schoolRec = new Record(schools)
-  schoolRec.set("name", "Cliffs Elementary")
+  schoolRec.set("name", $os.getenv("CLIFFS_SCHOOL_NAME") || "Cliffs Elementary")
   schoolRec.set("active", true)
   app.save(schoolRec)
   const schoolId = schoolRec.id
@@ -228,6 +228,10 @@ migrate((app) => {
     ],
   })
   app.save(settings)
+
+  // Deployment packaging fixes this choice per installation. Existing databases
+  // never rerun this migration; a clean live school gets no sample records.
+  if (!($os.getenv("CLIFFS_SEED_DEMO") !== "false")) return
 
   // ─── SEED: DELIVERY TIME SLOTS ────────────────────────────────────────────
   const t1045 = new Record(deliveryTimes)

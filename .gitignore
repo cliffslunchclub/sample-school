@@ -15,3 +15,4 @@ demo-data/
 *.log
 .DS_Store
 *.zip
+.deploy/
