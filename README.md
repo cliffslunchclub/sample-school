@@ -51,3 +51,17 @@ Brand text and API endpoint: frontend/.env.local
 Each new school should use the same source release with its own backend database, environment configuration and domain. This starter does not yet automate new-school provisioning or AWS deployment. Use a separate folder for independent local school tests; stop one before starting another because they use the same ports.
 
 PocketBase is pinned to 0.28.4 as a compatibility baseline for the export. The ZIP does not identify the original backend version. Validate migrations, authorization, backups and a supported PocketBase upgrade before production. Never publish the demo credentials. No AWS resources or live DNS were changed.
+
+## New admin features
+
+- **Administrators**: create another school admin with a name, email and password of at least 12 characters. Parents cannot use the creation endpoint or promote their accounts.
+- **Lunch Labels**: choose an exact lunch date, generate student labels and optionally two menu summary sets, then preview, print or use the browser's Save as PDF. CHS formatting uses Letter 30-label stock (1 × 2⅝ inches), four lines, bold names, menu/time row breaks with no blank separator rows, grouped chicken wraps, and extra cheeseburger slider/chicken nugget summaries. The weekday appears bold and right-aligned on summaries.
+- **Monday–Friday**: parent menus, selections, admin filters/overrides, summaries and CSV imports support five weekdays. The migration adds Tuesday, Thursday and Friday to existing menu availability; adjust each item in Menu if needed. Ordering still opens Thursday and Friday for the following week, using America/New_York.
+
+## Updating a downloaded copy
+
+Stop the old app with Control+C and keep its folder as a backup. Download Code → Download ZIP from this private repository and extract it into a new folder. To keep your local accounts, students and orders, copy the old folder's `pb_data` folder into the new project root **before starting it**. Do not copy `.runtime`, `frontend/node_modules`, or old source files. Run `npm start` in the new folder. The database migration applies automatically; a new empty folder instead starts with fresh demo data. Never upload `pb_data` to GitHub.
+
+## Checks
+
+After frontend dependencies are installed, run `npm test` from the project root for schedule, import and label regressions. In `frontend`, run `npx tsc --noEmit -p tsconfig.app.json` and `npm run build`. Print one plain-paper label sheet at 100% with browser headers and footers disabled before using label stock.

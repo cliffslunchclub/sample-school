@@ -32,7 +32,7 @@ export default function Settings() {
   const [passphrase] = useState<string>(() => genPassphrase());
   const [typed, setTyped] = useState("");
   const [purging, setPurging] = useState(false);
-  const [counts, setCounts] = useState<Counts>({ orders: 0, students: 0, teachers: 0, audit: 0 });
+  const [counts, setCounts] = useState<Counts>({ orders: 0, students: 0, teachers: 0, audit: 0, menu: 0 });
   const [purgeTargets, setPurgeTargets] = useState({ orders: true, students: false, teachers: false, menu: false });
 
   const match = typed.trim() === passphrase;
@@ -198,7 +198,7 @@ export default function Settings() {
           <CalendarDays className="h-5 w-5 text-leaf-600" /> Semester dates
         </div>
         <p className="mb-4 text-sm text-ink-soft">
-          All Monday and Wednesday dates between these dates are treated as lunch days.
+          All Monday through Friday dates between these dates are treated as lunch days.
           Changing these values takes effect immediately for all pages.
         </p>
         <form onSubmit={saveSemester} className="space-y-4">
@@ -229,7 +229,7 @@ export default function Settings() {
           <CalendarRange className="h-5 w-5 text-leaf-600" /> Lunch schedule &amp; ordering window
         </div>
         <p className="text-sm text-ink-soft">
-          Lunch is served every <strong>Monday and Wednesday</strong> for the semester. Parents can place
+          Lunch is served every <strong>Monday through Friday</strong> for the semester. Parents can place
           and change selections from <strong>Thursday 12:00&nbsp;AM until Friday 11:59&nbsp;PM</strong> for
           the following week; outside that window their orders are read-only. Administrators can change any
           order at any time.

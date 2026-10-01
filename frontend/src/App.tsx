@@ -31,6 +31,9 @@ import ImportData from "./pages/admin/ImportData";
 import GuideParent from "./pages/admin/GuideParent";
 import GuideAdmin from "./pages/admin/GuideAdmin";
 
+import Admins from "./pages/admin/Admins";
+import Labels from "./pages/admin/Labels";
+
 import NotFound from "./pages/NotFound";
 
 function Landing() {
@@ -79,6 +82,8 @@ const App = () => (
             <Route path="/admin/orders" element={<Orders />} />
             <Route path="/admin/summary" element={<Summary />} />
             <Route path="/admin/students" element={<AdminStudents />} />
+            <Route path="/admin/admins" element={<Admins />} />
+            <Route path="/admin/labels" element={<Labels />} />
             <Route path="/admin/parents" element={<Parents />} />
             <Route path="/admin/menu" element={<Menu />} />
             <Route path="/admin/grades" element={<GradesTeachers />} />

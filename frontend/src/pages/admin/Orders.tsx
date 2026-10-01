@@ -1,3 +1,4 @@
+import { WEEKDAYS, weekdayOf, type Weekday } from "../../lib/semester";
 import { useEffect, useMemo, useState } from "react";
 import { Search, ArrowUpDown, Pencil, Table2, X, Download, Plus } from "lucide-react";
 import pb from "../../lib/pocketbase";
@@ -16,9 +17,9 @@ import type {
 type SortKey = "date" | "time" | "meal" | "student" | "grade" | "teacher" | "parent" | "modified";
 
 /** Derive weekday label from a PocketBase date string safely. */
-function lunchWeekday(dateStr: string): "Monday" | "Wednesday" {
+function lunchWeekday(dateStr: string): Weekday {
   const key = keyOf(dateStr); // "YYYY-MM-DD"
-  return new Date(key + "T12:00:00Z").getUTCDay() === 1 ? "Monday" : "Wednesday";
+  return weekdayOf(key);
 }
 
 export default function Orders() {
@@ -32,7 +33,7 @@ export default function Orders() {
   const [loading, setLoading] = useState(true);
 
   const [q, setQ] = useState("");
-  const [fDay, setFDay] = useState<"" | "Monday" | "Wednesday">("");
+  const [fDay, setFDay] = useState<"" | Weekday>("");
   const [fTime, setFTime] = useState("");
   const [fGrade, setFGrade] = useState("");
   const [fTeacher, setFTeacher] = useState("");
@@ -182,10 +183,9 @@ export default function Orders() {
 
         {/* Always-visible filter row */}
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <Select value={fDay} onChange={(e) => setFDay(e.target.value as "" | "Monday" | "Wednesday")}>
+          <Select value={fDay} onChange={(e) => setFDay(e.target.value as "" | Weekday)}>
             <option value="">All days</option>
-            <option value="Monday">Monday</option>
-            <option value="Wednesday">Wednesday</option>
+            {WEEKDAYS.map(day => <option key={day} value={day}>{day}</option>)}
           </Select>
           <Select value={fTime} onChange={(e) => setFTime(e.target.value)}>
             <option value="">All delivery times</option>

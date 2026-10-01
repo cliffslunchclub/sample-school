@@ -1,3 +1,4 @@
+import { WEEKDAYS, weekdayOf, type Weekday } from "../lib/semester";
 import { useEffect, useState } from "react";
 import { Modal, Field, Select, Textarea, Button, useToast } from "./ui";
 import { adminSetMeal, deriveDeliveryTime } from "../lib/admin";
@@ -5,7 +6,7 @@ import { keyOf, type LunchDate } from "../lib/semester";
 import { useAuth } from "../lib/auth";
 import type { Student, MenuItem, DeliveryTime, DeliveryRule } from "../lib/types";
 
-type Weekday = "Monday" | "Wednesday";
+
 
 /** Pick the next upcoming occurrence of a weekday, or the first one in the list as fallback. */
 function resolveKey(weekday: Weekday, lunchDates: LunchDate[]): string {
@@ -17,7 +18,7 @@ function resolveKey(weekday: Weekday, lunchDates: LunchDate[]): string {
 
 /** Derive weekday label from a YYYY-MM-DD key. */
 function keyToWeekday(key: string): Weekday {
-  return new Date(key + "T12:00:00Z").getUTCDay() === 1 ? "Monday" : "Wednesday";
+  return weekdayOf(key);
 }
 
 export function MealOverrideModal({
@@ -47,7 +48,7 @@ export function MealOverrideModal({
   const toast = useToast();
 
   // When fixedLunchKey is given, weekday is derived from it (read-only).
-  // When free, admin picks Monday or Wednesday and we resolve to the next occurrence.
+  // When free, admin picks a weekday and we resolve to the next occurrence.
   const [weekday, setWeekday] = useState<Weekday>("Monday");
   const [menuItem, setMenuItem] = useState(currentMenuItem ?? "");
   const [deliveryTimeId, setDeliveryTimeId] = useState("");
@@ -117,8 +118,7 @@ export function MealOverrideModal({
               onChange={(e) => setWeekday(e.target.value as Weekday)}
               required
             >
-              <option value="Monday">Monday</option>
-              <option value="Wednesday">Wednesday</option>
+              {WEEKDAYS.map(day => <option key={day} value={day}>{day}</option>)}
             </Select>
           )}
         </Field>

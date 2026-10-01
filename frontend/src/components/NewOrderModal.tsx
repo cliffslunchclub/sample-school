@@ -129,9 +129,8 @@ export function NewOrderModal({
     }
   };
 
-  // Only the next upcoming Monday and Wednesday are offered
-  const nextMonday    = lunchDates.find((d) => d.weekday === "Monday")?.key    ?? "";
-  const nextWednesday = lunchDates.find((d) => d.weekday === "Wednesday")?.key ?? "";
+  const today = new Intl.DateTimeFormat("en-CA", {timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+  const upcomingDates = lunchDates.filter(d => d.key >= today);
 
   return (
     <Modal open={open} onClose={onClose} title="New order">
@@ -150,8 +149,7 @@ export function NewOrderModal({
         <Field label="Day" required>
           <Select value={lunchKey} onChange={(e) => setLunchKey(e.target.value)} required>
             <option value="">Select day…</option>
-            {nextMonday    && <option value={nextMonday}>Monday</option>}
-            {nextWednesday && <option value={nextWednesday}>Wednesday</option>}
+            {upcomingDates.map(d => <option key={d.key} value={d.key}>{d.weekday} · {d.key}</option>)}
           </Select>
         </Field>
 

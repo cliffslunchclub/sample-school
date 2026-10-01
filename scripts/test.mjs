@@ -1,0 +1,55 @@
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+const require=createRequire(new URL('../frontend/package.json',import.meta.url));
+const ts=require('typescript');
+const transpile=(file)=>ts.transpileModule(readFileSync(new URL(file,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+const uri=code=>'data:text/javascript;base64,'+Buffer.from(code).toString('base64');
+const scheduleUri=uri(transpile('../frontend/src/lib/semester.ts'));
+const {WEEKDAYS,lunchDates,orderingWindow}=await import(scheduleUri);
+const {buildLabels,labelsHtml}=await import(uri(transpile('../frontend/src/lib/labels.ts').replace('"./semester"',JSON.stringify(scheduleUri))));
+assert.deepEqual(lunchDates('2026-10-05','2026-10-11').map(d=>d.weekday),[...WEEKDAYS]);
+const window=orderingWindow(new Date('2026-10-01T18:00:00Z'));
+assert.equal(window.open,true);assert.deepEqual(window.keys,['2026-10-05','2026-10-06','2026-10-07','2026-10-08','2026-10-09']);
+assert.equal(orderingWindow(new Date('2026-10-03T04:00:00Z')).open,false);
+assert.equal(orderingWindow(new Date('2026-10-02T03:59:59Z')).open,true);
+const key='2026-10-05';
+const names=['Cheeseburger Sliders + TT','Chicken Nuggets + TT','Grilled Chicken Caesar Wrap','Grilled Chicken Wrap (Plain)',...Array.from({length:11},(_,i)=>`Meal ${i+1}`)];
+const menu=names.map((name,i)=>({id:String(i),name,active:true,days:[...WEEKDAYS],description:''}));
+const times=[{id:'early',label:'10:45',active:true},{id:'late',label:'11:45',active:true}];
+const order=(id,item,time='early',grade='Grade 3')=>({id,student:id,menu_item:String(item),delivery_time:time,lunch_date:key+'T12:00:00Z',expand:{student:{name:'Student '+id,expand:{grade:{name:grade},teacher:{name:'Teacher'}}}}});
+const result=buildLabels([order('a',0),order('b',0,'late'),order('c',2),order('d',3),order('e',1,'early','Faculty/Staff')],menu,times,key);
+assert.equal(result.studentCount,5);assert.equal(result.summaryCount,34);
+const labels=result.slots.filter(Boolean);
+assert.equal(labels[0].lines[0].text,'Student a');assert.equal(labels[0].lines[0].bold,true);assert.equal(labels[0].lines[2].text,'3 - Teacher');
+assert.equal(result.slots[3].lines[0].text,'Student b'); // time change starts next row, with no empty separator row
+assert.ok(labels.find(l=>l.lines[0].text==='Student e').lines.some(l=>l.text==='FACULTY/STAFF 10:45'));
+const wraps=result.slots.flatMap((l,i)=>l?.lines[1]?.text.includes('Wrap')?[i]:[]);assert.equal(wraps[1]-wraps[0],1);
+assert.equal(result.slots.findIndex(l=>l?.kind==='summary'),30);
+assert.equal(labels.filter(l=>l.kind==='summary'&&l.lines[0].text===names[0]).length,4);
+assert.ok(labels.filter(l=>l.kind==='summary').every(l=>l.lines.at(-1).text==='MONDAY'&&l.lines.at(-1).right&&l.lines.at(-1).bold));
+const many=buildLabels(Array.from({length:29},(_,i)=>order(String(i),0)).concat(order('new',1)),menu,times,key,false);
+assert.equal(many.slots[30].lines[0].text,'Student new');assert.equal(many.slots.length,31); // naturally cross sheet at a row boundary
+assert.equal(buildLabels([],menu,times,key).slots.length,0);
+assert.ok(labelsHtml(buildLabels([order('<script>',0)],menu,times,key,false),'test').includes('&lt;script&gt;'));
+console.log('PASS: five-day calendar and timezone boundaries; label row/page boundaries, wrap grouping, staff labels, 34 summaries, escaping and empty dates');
+
+// Import regression: each added day matches, resolves conflicts, and writes the correct date.
+const csvUri=uri(transpile('../frontend/src/lib/csv.ts'));
+const analyzeCode=transpile('../frontend/src/lib/importAnalyze.ts').replace('import pb from "./pocketbase";','const pb = {};').replace('"./csv"',JSON.stringify(csvUri));
+const {analyzeCombined}=await import(uri(analyzeCode));
+const ref={grades:[{id:'grade',name:'Grade 3',sort_order:1}],teachers:[{id:'teacher',name:'Teacher',grade:'grade'}],students:[{id:'student',name:'Demo Student',grade:'grade',teacher:'teacher',parent:'parent'}],menu,times:[],rules:[],selections:[]};
+const mapping={student_name:0,grade:1,teacher:2,tuesday_meal:3,thursday_meal:4,friday_meal:5};
+const extraKeys={tuesday:'2026-10-06',thursday:'2026-10-08',friday:'2026-10-09'};
+const analysis=analyzeCombined([['Demo Student','3','Teacher',names[0],names[1],names[0]]],mapping,ref,key,'2026-10-07',extraKeys);
+assert.equal(analysis.stats.tuesdayOrders,1);assert.equal(analysis.stats.thursdayOrders,1);assert.equal(analysis.stats.fridayOrders,1);assert.equal(analysis.rows[0].status,'matched');
+const invalid=analyzeCombined([['Demo Student','3','Teacher',names[0]]],mapping,ref,key,'2026-10-07',{});assert.equal(invalid.rows[0].status,'error');
+const writes=[];globalThis.__importMock={collection:()=>({create:async p=>{writes.push(p);return {...p,id:'created'+writes.length};},update:async(id,p)=>{writes.push(p);return {...p,id};}})};
+const executeCode=transpile('../frontend/src/lib/importExecute.ts').replace('import pb from "./pocketbase";','const pb = globalThis.__importMock;').replace('"./csv"',JSON.stringify(csvUri));
+const {executeCombined}=await import(uri(executeCode));
+const executed=await executeCombined(analysis.rows,ref,key,'2026-10-07',{schoolId:'school'},extraKeys);
+assert.equal(executed.createdMeals,3);assert.deepEqual(writes.map(p=>p.lunch_date.slice(0,10)),Object.values(extraKeys));
+const conflictRef={...ref,selections:[{id:'old',student:'student',menu_item:'0',lunch_date:'2026-10-06T12:00:00Z'}]};
+const conflict=analyzeCombined([['Demo Student','3','Teacher',names[1]]],mapping,conflictRef,key,'2026-10-07',extraKeys);assert.equal(conflict.stats.tuesdayConflicts,1);assert.equal(conflict.rows[0].status,'conflict');
+conflict.rows[0].tuesdayResolution='keep';assert.equal((await executeCombined(conflict.rows,conflictRef,key,'2026-10-07',{schoolId:'school'},extraKeys)).skipped,2);
+console.log('PASS: Tuesday/Thursday/Friday CSV matching and writes, missing semester date validation and conflict keep behavior');

@@ -10,7 +10,7 @@ import { Card, Button, Select, Spinner, Badge, useToast } from "../../components
 import { PageHeader } from "../../components/PageHeader";
 import { formatDateTime } from "../../lib/format";
 import { guessColumn, toCsv, downloadFile } from "../../lib/csv";
-import { lunchDates } from "../../lib/semester";
+import { WEEKDAYS, lunchDates } from "../../lib/semester";
 import { useSemester } from "../../lib/SemesterContext";
 import type { MenuItem } from "../../lib/types";
 import {
@@ -37,10 +37,10 @@ const STEPS: { key: Step; label: string }[] = [
 ];
 
 const TEMPLATE_ROWS = [
-  ["Student Name", "Grade", "Teacher", "Delivery Time", "Monday Meal", "Wednesday Meal"],
-  ["John Smith",   "Grade 3",      "DelPriore", "11:45", "Chicken Teriyaki Bowl",       "Bulgogi Beef Bowl"],
-  ["Jane Smith",   "Grade 1",      "Carter",    "10:45", "Cheeseburger Sliders + TT",   "Chicken Quesadilla"],
-  ["Jordan Smith", "Kindergarten", "Anderson",  "10:45", "Chicken Nuggets + TT",        "Grilled Cheese + TT"],
+  ["Student Name", "Grade", "Teacher", "Delivery Time", "Monday Meal", "Tuesday Meal", "Wednesday Meal", "Thursday Meal", "Friday Meal"],
+  ["John Smith",   "Grade 3",      "DelPriore", "11:45", "Chicken Teriyaki Bowl", "Chicken Alfredo Pasta", "Bulgogi Beef Bowl", "Chicken Fried Rice", "Chicken Nuggets + TT"],
+  ["Jane Smith",   "Grade 1",      "Carter",    "10:45", "Cheeseburger Sliders + TT", "Chicken Nuggets + TT", "Chicken Quesadilla", "Chicken Fried Rice", "Grilled Cheese + TT"],
+  ["Jordan Smith", "Kindergarten", "Anderson",  "10:45", "Chicken Nuggets + TT", "Chicken Fried Rice", "Grilled Cheese + TT", "Chicken Quesadilla", "Chicken Teriyaki Bowl"],
 ];
 
 export default function ImportData() {
@@ -72,8 +72,16 @@ export default function ImportData() {
     if (!mondayKey) return "";
     const d = new Date(`${mondayKey}T12:00:00Z`);
     d.setUTCDate(d.getUTCDate() + 2);
-    return d.toISOString().slice(0, 10);
-  }, [mondayKey]);
+    const key = d.toISOString().slice(0, 10);
+    return key <= end ? key : "";
+  }, [mondayKey, end]);
+
+  const extraKeys = useMemo(() => Object.fromEntries([['tuesday', 1], ['thursday', 3], ['friday', 4]].map(([day, offset]) => {
+    if (!mondayKey) return [day, ""];
+    const d = new Date(`${mondayKey}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + Number(offset));
+    const key = d.toISOString().slice(0, 10);
+    return [day, key <= end ? key : ""];
+  })), [mondayKey, end]);
 
   // Load menu items on mount so they're visible before uploading
   useEffect(() => {
@@ -131,7 +139,7 @@ export default function ImportData() {
 
   const runAnalyze = () => {
     if (!parsed || !ref) return;
-    const a = analyzeCombined(parsed.rows, mapping, ref, mondayKey, wednesdayKey);
+    const a = analyzeCombined(parsed.rows, mapping, ref, mondayKey, wednesdayKey, extraKeys);
     setAnalysis(a);
     setIssuesOnly(false);
     setStep("preview");
@@ -139,10 +147,22 @@ export default function ImportData() {
 
   const setMondayResolution = (line: number, val: "keep" | "replace" | "add") =>
     setAnalysis((a) => a ? { ...a, rows: a.rows.map((r) => r.line === line ? { ...r, mondayResolution: val } : r) } : a);
+  const setTuesdayResolution = (line: number, val: "keep" | "replace" | "add") =>
+    setAnalysis((a) => a ? { ...a, rows: a.rows.map((r) => r.line === line ? { ...r, tuesdayResolution: val } : r) } : a);
+  const setThursdayResolution = (line: number, val: "keep" | "replace" | "add") =>
+    setAnalysis((a) => a ? { ...a, rows: a.rows.map((r) => r.line === line ? { ...r, thursdayResolution: val } : r) } : a);
+  const setFridayResolution = (line: number, val: "keep" | "replace" | "add") =>
+    setAnalysis((a) => a ? { ...a, rows: a.rows.map((r) => r.line === line ? { ...r, fridayResolution: val } : r) } : a);
   const setWednesdayResolution = (line: number, val: "keep" | "replace" | "add") =>
     setAnalysis((a) => a ? { ...a, rows: a.rows.map((r) => r.line === line ? { ...r, wednesdayResolution: val } : r) } : a);
   const setAllMonday = (val: "keep" | "replace" | "add") =>
     setAnalysis((a) => a ? { ...a, rows: a.rows.map((r) => r.mondayConflict ? { ...r, mondayResolution: val } : r) } : a);
+  const setAllTuesday = (val: "keep" | "replace" | "add") =>
+    setAnalysis((a) => a ? { ...a, rows: a.rows.map((r) => r.tuesdayConflict ? { ...r, tuesdayResolution: val } : r) } : a);
+  const setAllThursday = (val: "keep" | "replace" | "add") =>
+    setAnalysis((a) => a ? { ...a, rows: a.rows.map((r) => r.thursdayConflict ? { ...r, thursdayResolution: val } : r) } : a);
+  const setAllFriday = (val: "keep" | "replace" | "add") =>
+    setAnalysis((a) => a ? { ...a, rows: a.rows.map((r) => r.fridayConflict ? { ...r, fridayResolution: val } : r) } : a);
   const setAllWednesday = (val: "keep" | "replace" | "add") =>
     setAnalysis((a) => a ? { ...a, rows: a.rows.map((r) => r.wednesdayConflict ? { ...r, wednesdayResolution: val } : r) } : a);
 
@@ -150,7 +170,7 @@ export default function ImportData() {
     if (!analysis || !ref) return;
     setBusy(true);
     try {
-      const r = await executeCombined(analysis.rows, ref, mondayKey, wednesdayKey, { schoolId: user!.school });
+      const r = await executeCombined(analysis.rows, ref, mondayKey, wednesdayKey, { schoolId: user!.school }, extraKeys);
       await pb.collection("import_history").create({
         filename,
         import_type: "combined",
@@ -175,8 +195,8 @@ export default function ImportData() {
   const activeIdx = STEPS.findIndex((s) => s.key === step);
 
   const flagged = analysis?.rows.filter(
-    (r) => r.status === "error" || r.status === "duplicate" || r.mondayConflict || r.wednesdayConflict
-      || (r.mondayMenuName && !r.mondayMenuMatched) || (r.wednesdayMenuName && !r.wednesdayMenuMatched)
+    (r) => r.status === "error" || r.status === "duplicate" || r.mondayConflict || r.wednesdayConflict || r.tuesdayConflict || r.thursdayConflict || r.fridayConflict
+      || (r.mondayMenuName && !r.mondayMenuMatched) || (r.wednesdayMenuName && !r.wednesdayMenuMatched) || (r.tuesdayMenuName && !r.tuesdayMenuMatched) || (r.thursdayMenuName && !r.thursdayMenuMatched) || (r.fridayMenuName && !r.fridayMenuMatched)
   ) ?? [];
 
   const previewRows = issuesOnly ? flagged : (analysis?.rows ?? []);
@@ -238,8 +258,8 @@ export default function ImportData() {
 
             <div className="mt-4 rounded-xl bg-cream/60 px-4 py-3 text-xs text-ink-soft">
               <strong className="text-ink">Template columns:</strong>{" "}
-              Student Name · Grade · Teacher · Delivery Time · Monday Meal · Wednesday Meal.
-              Leave Monday Meal or Wednesday Meal blank to skip that day's order.
+              Student Name · Grade · Teacher · Delivery Time · Monday through Friday Meal columns.
+              Leave any day's Meal column blank to skip that day's order.
             </div>
           </Card>
 
@@ -342,7 +362,7 @@ export default function ImportData() {
                 </button>
               </div>
 
-              {(analysis.stats.mondayConflicts > 0 || analysis.stats.wednesdayConflicts > 0) && (
+              {(analysis.stats.mondayConflicts > 0 || analysis.stats.wednesdayConflicts > 0 || analysis.stats.tuesdayConflicts > 0 || analysis.stats.thursdayConflicts > 0 || analysis.stats.fridayConflicts > 0) && (
                 <div className="flex flex-wrap items-center gap-3 text-xs">
                   {analysis.stats.mondayConflicts > 0 && (
                     <div className="flex items-center gap-1.5">
@@ -350,6 +370,30 @@ export default function ImportData() {
                       <button onClick={() => setAllMonday("replace")} className="rounded-lg bg-tomato-50 px-2.5 py-1 font-bold text-tomato-600 hover:bg-tomato-100">Overwrite all</button>
                       <button onClick={() => setAllMonday("keep")} className="rounded-lg bg-cream-deep px-2.5 py-1 font-bold text-ink hover:bg-line">Keep existing</button>
                       <button onClick={() => setAllMonday("add")} className="rounded-lg bg-sun-50 px-2.5 py-1 font-bold text-[oklch(0.5_0.12_70)] hover:bg-sun-100">Add</button>
+                    </div>
+                  )}
+                  {analysis.stats.tuesdayConflicts > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-ink-soft">Tue conflicts:</span>
+                      <button onClick={() => setAllTuesday("replace")} className="rounded-lg bg-tomato-50 px-2.5 py-1 font-bold text-tomato-600 hover:bg-tomato-100">Overwrite all</button>
+                      <button onClick={() => setAllTuesday("keep")} className="rounded-lg bg-cream-deep px-2.5 py-1 font-bold text-ink hover:bg-line">Keep existing</button>
+                      <button onClick={() => setAllTuesday("add")} className="rounded-lg bg-sun-50 px-2.5 py-1 font-bold text-[oklch(0.5_0.12_70)] hover:bg-sun-100">Add</button>
+                    </div>
+                  )}
+                  {analysis.stats.thursdayConflicts > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-ink-soft">Thu conflicts:</span>
+                      <button onClick={() => setAllThursday("replace")} className="rounded-lg bg-tomato-50 px-2.5 py-1 font-bold text-tomato-600 hover:bg-tomato-100">Overwrite all</button>
+                      <button onClick={() => setAllThursday("keep")} className="rounded-lg bg-cream-deep px-2.5 py-1 font-bold text-ink hover:bg-line">Keep existing</button>
+                      <button onClick={() => setAllThursday("add")} className="rounded-lg bg-sun-50 px-2.5 py-1 font-bold text-[oklch(0.5_0.12_70)] hover:bg-sun-100">Add</button>
+                    </div>
+                  )}
+                  {analysis.stats.fridayConflicts > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-ink-soft">Fri conflicts:</span>
+                      <button onClick={() => setAllFriday("replace")} className="rounded-lg bg-tomato-50 px-2.5 py-1 font-bold text-tomato-600 hover:bg-tomato-100">Overwrite all</button>
+                      <button onClick={() => setAllFriday("keep")} className="rounded-lg bg-cream-deep px-2.5 py-1 font-bold text-ink hover:bg-line">Keep existing</button>
+                      <button onClick={() => setAllFriday("add")} className="rounded-lg bg-sun-50 px-2.5 py-1 font-bold text-[oklch(0.5_0.12_70)] hover:bg-sun-100">Add</button>
                     </div>
                   )}
                   {analysis.stats.wednesdayConflicts > 0 && (
@@ -372,7 +416,11 @@ export default function ImportData() {
                     <th className="px-4 py-2.5">Student</th>
                     <th className="px-4 py-2.5">Class</th>
                     <th className="px-4 py-2.5">Monday</th>
-                    <th className="px-4 py-2.5">Wednesday</th>
+                    <th className="px-4 py-2.5">Tuesday</th>
+<th className="px-4 py-2.5">Wednesday</th>
+<th className="px-4 py-2.5">Thursday</th>
+<th className="px-4 py-2.5">Friday</th>
+
                     <th className="px-4 py-2.5">Status</th>
                   </tr>
                 </thead>
@@ -380,8 +428,8 @@ export default function ImportData() {
                   {previewRows.slice(0, 500).map((r) => (
                     <tr key={r.line} className={`align-top ${
                       r.status === "error" || r.status === "duplicate" ? "bg-tomato-50/30" :
-                      r.mondayConflict || r.wednesdayConflict ? "bg-amber-50/40" :
-                      (r.mondayMenuName && !r.mondayMenuMatched) || (r.wednesdayMenuName && !r.wednesdayMenuMatched) ? "bg-amber-50/20" : ""
+                      r.mondayConflict || r.wednesdayConflict || r.tuesdayConflict || r.thursdayConflict || r.fridayConflict ? "bg-amber-50/40" :
+                      (r.mondayMenuName && !r.mondayMenuMatched) || (r.wednesdayMenuName && !r.wednesdayMenuMatched) || (r.tuesdayMenuName && !r.tuesdayMenuMatched) || (r.thursdayMenuName && !r.thursdayMenuMatched) || (r.fridayMenuName && !r.fridayMenuMatched) ? "bg-amber-50/20" : ""
                     }`}>
                       <td className="px-4 py-2.5 text-ink-faint">{r.line}</td>
                       <td className="px-4 py-2.5 font-bold text-ink">{r.studentName || <span className="text-ink-faint">—</span>}</td>
@@ -398,12 +446,42 @@ export default function ImportData() {
                       </td>
                       <td className="px-4 py-2.5">
                         <MealCell
+                          menuName={r.tuesdayMenuName}
+                          menuMatched={r.tuesdayMenuMatched}
+                          conflict={r.tuesdayConflict}
+                          existingName={r.tuesdayExistingMealName}
+                          resolution={r.tuesdayResolution}
+                          onResolution={(v) => setTuesdayResolution(r.line, v)}
+                        />
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <MealCell
                           menuName={r.wednesdayMenuName}
                           menuMatched={r.wednesdayMenuMatched}
                           conflict={r.wednesdayConflict}
                           existingName={r.wednesdayExistingMealName}
                           resolution={r.wednesdayResolution}
                           onResolution={(v) => setWednesdayResolution(r.line, v)}
+                        />
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <MealCell
+                          menuName={r.thursdayMenuName}
+                          menuMatched={r.thursdayMenuMatched}
+                          conflict={r.thursdayConflict}
+                          existingName={r.thursdayExistingMealName}
+                          resolution={r.thursdayResolution}
+                          onResolution={(v) => setThursdayResolution(r.line, v)}
+                        />
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <MealCell
+                          menuName={r.fridayMenuName}
+                          menuMatched={r.fridayMenuMatched}
+                          conflict={r.fridayConflict}
+                          existingName={r.fridayExistingMealName}
+                          resolution={r.fridayResolution}
+                          onResolution={(v) => setFridayResolution(r.line, v)}
                         />
                       </td>
                       <td className="px-4 py-2.5">
@@ -426,7 +504,7 @@ export default function ImportData() {
             <p className="text-sm text-ink-soft">
               Ready to import <strong className="text-ink">{analysis.stats.valid}</strong> student rows,{" "}
               <strong className="text-ink">{analysis.stats.mondayOrders}</strong> Monday and{" "}
-              <strong className="text-ink">{analysis.stats.wednesdayOrders}</strong> Wednesday orders.
+              <strong className="text-ink">{analysis.stats.wednesdayOrders}</strong> Wednesday orders, plus {analysis.stats.tuesdayOrders} Tuesday, {analysis.stats.thursdayOrders} Thursday and {analysis.stats.fridayOrders} Friday orders.
               {analysis.stats.errors > 0 && <span className="text-tomato-600"> {analysis.stats.errors} error rows will be skipped.</span>}
             </p>
             <div className="flex gap-2">
@@ -489,10 +567,6 @@ function CopyButton({ text }: { text: string }) {
 function MenuReference({ items }: { items: MenuItem[] }) {
   const [open, setOpen] = useState(false);
 
-  const monday    = items.filter((m) => m.days.includes("Monday") && !m.days.includes("Wednesday"));
-  const wednesday = items.filter((m) => m.days.includes("Wednesday") && !m.days.includes("Monday"));
-  const both      = items.filter((m) => m.days.includes("Monday") && m.days.includes("Wednesday"));
-
   if (items.length === 0) return null;
 
   return (
@@ -514,9 +588,7 @@ function MenuReference({ items }: { items: MenuItem[] }) {
       {open && (
         <div className="border-t border-line px-5 pb-5 pt-4">
           <div className="grid gap-5 sm:grid-cols-3">
-            <MenuGroup label="Monday" items={[...monday, ...both]} accentClass="text-leaf-700" />
-            <MenuGroup label="Wednesday" items={[...wednesday, ...both]} accentClass="text-leaf-700" />
-            <MenuGroup label="Both days" items={both} accentClass="text-ink-soft" />
+            {WEEKDAYS.map(day => <MenuGroup key={day} label={day} items={items.filter(m => m.days?.includes(day))} accentClass="text-leaf-700" />)}
           </div>
           <p className="mt-4 text-xs text-ink-faint">
             Names must match exactly (case-insensitive). Use the copy button to avoid typos.
@@ -607,15 +679,18 @@ function CombinedStatsView({ s }: { s: CombinedStats }) {
         <Stat icon={<CheckCircle2 className="h-4 w-4" />} tone="green"   label={<><strong>{s.valid}</strong>&nbsp;valid student rows</>} />
         <Stat icon={<CheckCircle2 className="h-4 w-4" />} tone="green"   label={<><strong>{s.newStudents}</strong>&nbsp;new · <strong>{s.matchedStudents}</strong>&nbsp;existing students</>} />
         <Stat icon={<CheckCircle2 className="h-4 w-4" />} tone={s.mondayOrders > 0 ? "green" : "neutral"}  label={<><strong>{s.mondayOrders}</strong>&nbsp;Monday orders matched</>} />
+        <Stat icon={<CheckCircle2 className="h-4 w-4" />} tone={s.tuesdayOrders > 0 ? "green" : "neutral"}  label={<><strong>{s.tuesdayOrders}</strong>&nbsp;Tuesday orders matched</>} />
+        <Stat icon={<CheckCircle2 className="h-4 w-4" />} tone={s.thursdayOrders > 0 ? "green" : "neutral"}  label={<><strong>{s.thursdayOrders}</strong>&nbsp;Thursday orders matched</>} />
+        <Stat icon={<CheckCircle2 className="h-4 w-4" />} tone={s.fridayOrders > 0 ? "green" : "neutral"}  label={<><strong>{s.fridayOrders}</strong>&nbsp;Friday orders matched</>} />
         <Stat icon={<CheckCircle2 className="h-4 w-4" />} tone={s.wednesdayOrders > 0 ? "green" : "neutral"} label={<><strong>{s.wednesdayOrders}</strong>&nbsp;Wednesday orders matched</>} />
-        <Stat icon={<AlertTriangle className="h-4 w-4" />} tone="amber"  label={<><strong>{s.mondayConflicts + s.wednesdayConflicts}</strong>&nbsp;conflicts requiring review</>} />
+        <Stat icon={<AlertTriangle className="h-4 w-4" />} tone="amber"  label={<><strong>{s.mondayConflicts + s.wednesdayConflicts + s.tuesdayConflicts + s.thursdayConflicts + s.fridayConflicts}</strong>&nbsp;conflicts requiring review</>} />
         <Stat icon={<XCircle className="h-4 w-4" />}       tone="red"    label={<><strong>{s.errors}</strong>&nbsp;rows with errors</>} />
       </div>
 
-      {s.menuCount > 0 && (s.mondayOrders === 0 && s.wednesdayOrders === 0) && (
+      {s.menuCount > 0 && (s.mondayOrders === 0 && s.wednesdayOrders === 0 && s.tuesdayOrders === 0 && s.thursdayOrders === 0 && s.fridayOrders === 0) && (
         <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
           <strong>0 orders matched</strong> even though {s.menuCount} menu item{s.menuCount !== 1 ? "s" : ""} exist in the database.
-          Check that the Monday Meal / Wednesday Meal column names in your CSV match the items shown in the reference panel below (or in the Upload step).
+          Check that the weekday Meal column names in your CSV match the items shown in the reference panel below (or in the Upload step).
         </p>
       )}
     </Card>
@@ -642,7 +717,7 @@ function ResultTile({ label, value, tone }: { label: string; value: number; tone
 
 function ImportHistory({ history }: { history: HistoryRec[] }) {
   const typeLabel = (t: string) => {
-    if (t === "combined") return <Badge tone="blue">Combined</Badge>;
+    if (t === "combined") return <Badge tone="neutral">Combined</Badge>;
     if (t === "roster")   return <Badge tone="green">Roster</Badge>;
     return <Badge tone="sun">Orders</Badge>;
   };

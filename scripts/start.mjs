@@ -35,7 +35,7 @@ for(const [command,args,cwd] of [
   [binary,['serve','--http=127.0.0.1:8090','--dir='+path.join(root,'pb_data'),'--hooksDir='+path.join(root,'pb_hooks'),'--migrationsDir='+path.join(root,'pb_migrations')],root],
   ['npm',['run','dev'],path.join(root,'frontend')]
 ]) {
- const child=spawn(command,args,{cwd,stdio:'inherit'}); children.push(child);
+ const child=spawn(command,args,{cwd,stdio:'inherit',env:{...process.env,TZ:"America/New_York"}}); children.push(child);
  child.on('error',e=>{console.error(e.message);stop(1)});
  child.on('exit',code=>{if(!stopping)stop(code || 1)});
 }

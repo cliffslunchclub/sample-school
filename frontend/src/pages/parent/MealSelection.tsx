@@ -4,7 +4,7 @@ import pb from "../../lib/pocketbase";
 import { useAuth } from "../../lib/auth";
 import { useToast, Button, Card, Select, EmptyState, Spinner, Badge } from "../../components/ui";
 import { PageHeader } from "../../components/PageHeader";
-import { editableLunchDates, isoForKey, keyOf, orderingWindow } from "../../lib/semester";
+import { weekdayOf, editableLunchDates, isoForKey, keyOf, orderingWindow } from "../../lib/semester";
 import { useSemester } from "../../lib/SemesterContext";
 import type { Student, MenuItem, DeliveryRule, MealSelection as Sel } from "../../lib/types";
 
@@ -60,10 +60,10 @@ export default function MealSelection() {
               const dk = keyOf(s.lunch_date);
               if (dk >= day.key) return false;
               const utcDow = new Date(`${dk}T12:00:00Z`).getUTCDay();
-              return day.weekday === "Monday" ? utcDow === 1 : utcDow === 3;
+              return utcDow === new Date(day.iso).getUTCDay();
             })
             .sort((a, b) => b.lunch_date.localeCompare(a.lunch_date))[0];
-          if (recent && activeMenuIds.has(recent.menu_item)) {
+          if (recent && activeMenuIds.has(recent.menu_item) && mi.find(m => m.id === recent.menu_item)?.days?.includes(day.weekday)) {
             d[k] = recent.menu_item;
             carried[k] = "previous week";
           }
@@ -174,8 +174,7 @@ export default function MealSelection() {
             <div className="flex items-start gap-2.5 text-sm font-bold text-[oklch(0.42_0.1_60)]">
               <Lock className="mt-0.5 h-5 w-5 shrink-0" />
               <span>
-                Ordering is open <strong>Thursday and Friday</strong> each week for the following Monday
-                and Wednesday. Your meals carry over automatically — come back Thursday to review or change.
+                Ordering is open <strong>Thursday and Friday</strong> each week for the following Monday through Friday. Previous selections are suggested — come back Thursday to review and save.
               </span>
             </div>
           </Card>
@@ -191,7 +190,7 @@ export default function MealSelection() {
                     <div key={o.id} className="flex items-center justify-between gap-3 px-5 py-3.5">
                       <div>
                         <p className="font-bold text-ink">{st?.name ?? "Student"}</p>
-                        <p className="text-xs text-ink-faint">{new Date(o.lunch_date).getUTCDay() === 1 ? "Monday" : "Wednesday"}</p>
+                        <p className="text-xs text-ink-faint">{weekdayOf(o.lunch_date)}</p>
                       </div>
                       <div className="flex items-center gap-1.5 text-sm font-bold text-ink">
                         <CheckCircle2 className="h-4 w-4 text-leaf-600" />

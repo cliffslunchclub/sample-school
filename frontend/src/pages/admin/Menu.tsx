@@ -6,7 +6,8 @@ import { Card, Button, Input, Textarea, Field, Modal, Spinner, EmptyState, Badge
 import { PageHeader } from "../../components/PageHeader";
 import type { MenuItem } from "../../lib/types";
 
-const DAY_OPTIONS: ("Monday" | "Wednesday")[] = ["Monday", "Wednesday"];
+import { WEEKDAYS, type Weekday } from "../../lib/semester";
+const DAY_OPTIONS = WEEKDAYS;
 
 export default function Menu() {
   const toast = useToast();
@@ -56,10 +57,10 @@ export default function Menu() {
                   <Badge tone={m.active ? "green" : "red"}>{m.active ? "Active" : "Inactive"}</Badge>
                 </button>
                 {(m.days ?? []).map((d) => (
-                  <Badge key={d} tone="blue">{d}</Badge>
+                  <Badge key={d} tone="neutral">{d}</Badge>
                 ))}
                 {(m.days ?? []).length === 0 && (
-                  <Badge tone="yellow">No days set</Badge>
+                  <Badge tone="amber">No days set</Badge>
                 )}
               </div>
             </Card>
@@ -89,10 +90,10 @@ function MenuForm({
   const [name, setName] = useState(item?.name ?? "");
   const [description, setDescription] = useState(item?.description ?? "");
   const [active, setActive] = useState(item?.active ?? true);
-  const [days, setDays] = useState<("Monday" | "Wednesday")[]>(item?.days ?? ["Monday", "Wednesday"]);
+  const [days, setDays] = useState<Weekday[]>(item?.days ?? [...WEEKDAYS]);
   const [saving, setSaving] = useState(false);
 
-  const toggleDay = (day: "Monday" | "Wednesday") =>
+  const toggleDay = (day: Weekday) =>
     setDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]);
 
   const submit = async (e: React.FormEvent) => {
@@ -126,7 +127,7 @@ function MenuForm({
           <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
         </Field>
         <Field label="Available on">
-          <div className="flex gap-4 pt-0.5">
+          <div className="flex flex-wrap gap-4 pt-0.5">
             {DAY_OPTIONS.map((day) => (
               <label key={day} className="flex cursor-pointer items-center gap-2 text-sm font-bold text-ink">
                 <input

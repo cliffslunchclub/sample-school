@@ -4,7 +4,7 @@ import pb from "../../lib/pocketbase";
 import { useAuth } from "../../lib/auth";
 import { Card, EmptyState, Spinner, Badge } from "../../components/ui";
 import { PageHeader } from "../../components/PageHeader";
-import { isKeyEditable, keyOf } from "../../lib/semester";
+import { weekdayOf, isKeyEditable, keyOf } from "../../lib/semester";
 import type { MealSelection as Sel } from "../../lib/types";
 
 export default function MyOrders() {
@@ -34,12 +34,12 @@ export default function MyOrders() {
       entry.items.push(o);
       map.set(k, entry);
     });
-    // Sort: newest week first; within the same week Monday before Wednesday
+    // Sort: newest week first; within the same week Monday through Friday
     const weekOf = (key: string) => {
       const d = new Date(key + "T12:00:00Z");
       if (d.getUTCDay() === 1) return key; // already Monday
       const mon = new Date(d);
-      mon.setUTCDate(d.getUTCDate() - 2);
+      mon.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
       return mon.toISOString().slice(0, 10);
     };
     return Array.from(map.values()).sort((a, b) => {
@@ -69,7 +69,7 @@ export default function MyOrders() {
                 <div className="flex items-center justify-between border-b border-line bg-cream/60 px-5 py-3">
                   <div className="flex items-center gap-2 font-extrabold text-ink">
                      <CalendarDays className="h-5 w-5 text-leaf-600" />
-                     {new Date(items[0].lunch_date).getUTCDay() === 1 ? "Monday" : "Wednesday"}
+                     {weekdayOf(items[0].lunch_date)}
                    </div>
                   <Badge tone={editable ? "green" : "neutral"}>{editable ? "Editable" : "Locked"}</Badge>
                 </div>

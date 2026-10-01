@@ -1,1 +1,11 @@
-{"name":"cliffs-school-local","private":true,"scripts":{"start":"node scripts/start.mjs"},"engines":{"node":">=22.12.0"}}
+{
+  "name": "cliffs-school-local",
+  "private": true,
+  "scripts": {
+    "start": "node scripts/start.mjs",
+    "test": "node scripts/test.mjs"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

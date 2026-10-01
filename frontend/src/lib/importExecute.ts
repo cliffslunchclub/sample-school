@@ -124,7 +124,11 @@ export async function executeCombined(
   mondayKey: string,
   wednesdayKey: string,
   ctx: Ctx,
+  extraKeys: Partial<Record<"tuesday" | "thursday" | "friday", string>> = {},
 ): Promise<ExecResult> {
+  const tuesdayKey = extraKeys.tuesday || "";
+  const thursdayKey = extraKeys.thursday || "";
+  const fridayKey = extraKeys.friday || "";
   const e = makeEnsurers(ref, ctx);
   const res: ExecResult = { imported: 0, skipped: 0, errors: 0, createdStudents: 0, createdMeals: 0, replacedMeals: 0 };
 
@@ -156,7 +160,7 @@ export async function executeCombined(
 
     // ── Monday order ──────────────────────────────────────────────────────────
     if (mondayKey && row.mondayMenuName) {
-      const menuItem = e.menuByNorm.get(norm(row.raw.mondayMenuRaw ?? ""));
+      const menuItem = ref.menu.find(m => m.id === row.mondayMenuId) || e.menuByNorm.get(norm(row.raw.mondayMenuRaw ?? ""));
       if (menuItem) {
         const existing = e.selByKey.get(`${student.id}|${mondayKey}`);
         const payload = { ...basePayload, lunch_date: e.lunchIsoFor(mondayKey), menu_item: menuItem.id };
@@ -179,9 +183,84 @@ export async function executeCombined(
       }
     }
 
+    // ── Tuesday order ──────────────────────────────────────────────────────────
+    if (tuesdayKey && row.tuesdayMenuName) {
+      const menuItem = ref.menu.find(m => m.id === row.tuesdayMenuId) || e.menuByNorm.get(norm(row.raw.tuesdayMenuRaw ?? ""));
+      if (menuItem) {
+        const existing = e.selByKey.get(`${student.id}|${tuesdayKey}`);
+        const payload = { ...basePayload, lunch_date: e.lunchIsoFor(tuesdayKey), menu_item: menuItem.id };
+        if (existing) {
+          const res_ = row.tuesdayResolution ?? "keep";
+          if (res_ === "replace") {
+            await pb.collection("meal_selections").update(existing.id, payload);
+            res.replacedMeals++; res.imported++;
+          } else if (res_ === "add") {
+            await pb.collection("meal_selections").create<MealSelection>(payload);
+            res.createdMeals++; res.imported++;
+          } else {
+            res.skipped++;
+          }
+        } else {
+          const rec = await pb.collection("meal_selections").create<MealSelection>(payload);
+          e.selByKey.set(`${student.id}|${tuesdayKey}`, rec);
+          res.createdMeals++; res.imported++;
+        }
+      }
+    }
+
+    // ── Thursday order ──────────────────────────────────────────────────────────
+    if (thursdayKey && row.thursdayMenuName) {
+      const menuItem = ref.menu.find(m => m.id === row.thursdayMenuId) || e.menuByNorm.get(norm(row.raw.thursdayMenuRaw ?? ""));
+      if (menuItem) {
+        const existing = e.selByKey.get(`${student.id}|${thursdayKey}`);
+        const payload = { ...basePayload, lunch_date: e.lunchIsoFor(thursdayKey), menu_item: menuItem.id };
+        if (existing) {
+          const res_ = row.thursdayResolution ?? "keep";
+          if (res_ === "replace") {
+            await pb.collection("meal_selections").update(existing.id, payload);
+            res.replacedMeals++; res.imported++;
+          } else if (res_ === "add") {
+            await pb.collection("meal_selections").create<MealSelection>(payload);
+            res.createdMeals++; res.imported++;
+          } else {
+            res.skipped++;
+          }
+        } else {
+          const rec = await pb.collection("meal_selections").create<MealSelection>(payload);
+          e.selByKey.set(`${student.id}|${thursdayKey}`, rec);
+          res.createdMeals++; res.imported++;
+        }
+      }
+    }
+
+    // ── Friday order ──────────────────────────────────────────────────────────
+    if (fridayKey && row.fridayMenuName) {
+      const menuItem = ref.menu.find(m => m.id === row.fridayMenuId) || e.menuByNorm.get(norm(row.raw.fridayMenuRaw ?? ""));
+      if (menuItem) {
+        const existing = e.selByKey.get(`${student.id}|${fridayKey}`);
+        const payload = { ...basePayload, lunch_date: e.lunchIsoFor(fridayKey), menu_item: menuItem.id };
+        if (existing) {
+          const res_ = row.fridayResolution ?? "keep";
+          if (res_ === "replace") {
+            await pb.collection("meal_selections").update(existing.id, payload);
+            res.replacedMeals++; res.imported++;
+          } else if (res_ === "add") {
+            await pb.collection("meal_selections").create<MealSelection>(payload);
+            res.createdMeals++; res.imported++;
+          } else {
+            res.skipped++;
+          }
+        } else {
+          const rec = await pb.collection("meal_selections").create<MealSelection>(payload);
+          e.selByKey.set(`${student.id}|${fridayKey}`, rec);
+          res.createdMeals++; res.imported++;
+        }
+      }
+    }
+
     // ── Wednesday order ───────────────────────────────────────────────────────
     if (wednesdayKey && row.wednesdayMenuName) {
-      const menuItem = e.menuByNorm.get(norm(row.raw.wednesdayMenuRaw ?? ""));
+      const menuItem = ref.menu.find(m => m.id === row.wednesdayMenuId) || e.menuByNorm.get(norm(row.raw.wednesdayMenuRaw ?? ""));
       if (menuItem) {
         const existing = e.selByKey.get(`${student.id}|${wednesdayKey}`);
         const payload = { ...basePayload, lunch_date: e.lunchIsoFor(wednesdayKey), menu_item: menuItem.id };

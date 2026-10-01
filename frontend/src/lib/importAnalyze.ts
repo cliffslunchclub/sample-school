@@ -17,7 +17,7 @@ export interface FieldDef {
   keywords: string[];
 }
 
-/** Single combined template — one row per student, two optional meal columns. */
+/** Single combined template — one row per student, five optional meal columns. */
 export const COMBINED_FIELDS: FieldDef[] = [
   { key: "student_name",  label: "Student Name",              required: true,  keywords: ["student name", "student", "name", "child"] },
   { key: "grade",         label: "Grade",                     required: false, keywords: ["grade level", "grade"] },
@@ -25,6 +25,9 @@ export const COMBINED_FIELDS: FieldDef[] = [
   { key: "grade_teacher", label: "Grade/Teacher (combined)",  required: false, keywords: ["grade/teacher", "grade-teacher", "classroom", "class"] },
   { key: "delivery_time", label: "Delivery Time",             required: false, keywords: ["delivery time", "delivery", "time"] },
   { key: "monday_meal",   label: "Monday Meal",               required: false, keywords: ["monday meal", "monday", "mon meal", "mon"] },
+  { key: "tuesday_meal", label: "Tuesday Meal", required: false, keywords: ["tuesday meal", "tuesday", "tue"] },
+  { key: "thursday_meal", label: "Thursday Meal", required: false, keywords: ["thursday meal", "thursday", "thu"] },
+  { key: "friday_meal", label: "Friday Meal", required: false, keywords: ["friday meal", "friday", "fri"] },
   { key: "wednesday_meal",label: "Wednesday Meal",            required: false, keywords: ["wednesday meal", "wednesday", "wed meal", "wed"] },
 ];
 
@@ -69,18 +72,38 @@ export interface AnalyzedRow {
   deliveryNew: boolean;
   // Per-day (combined import)
   mondayMenuName?: string;
+  mondayMenuId?: string;
   mondayMenuMatched?: boolean;
   mondayConflict?: boolean;
   mondayExistingMealName?: string;
   mondayResolution?: "keep" | "replace" | "add";
+  tuesdayMenuName?: string;
+  tuesdayMenuId?: string;
+  tuesdayMenuMatched?: boolean;
+  tuesdayConflict?: boolean;
+  tuesdayExistingMealName?: string;
+  tuesdayResolution?: "keep" | "replace" | "add";
+  thursdayMenuName?: string;
+  thursdayMenuId?: string;
+  thursdayMenuMatched?: boolean;
+  thursdayConflict?: boolean;
+  thursdayExistingMealName?: string;
+  thursdayResolution?: "keep" | "replace" | "add";
+  fridayMenuName?: string;
+  fridayMenuId?: string;
+  fridayMenuMatched?: boolean;
+  fridayConflict?: boolean;
+  fridayExistingMealName?: string;
+  fridayResolution?: "keep" | "replace" | "add";
   wednesdayMenuName?: string;
+  wednesdayMenuId?: string;
   wednesdayMenuMatched?: boolean;
   wednesdayConflict?: boolean;
   wednesdayExistingMealName?: string;
   wednesdayResolution?: "keep" | "replace" | "add";
   raw: {
     name: string; gradeRaw: string; teacherRaw: string; deliveryRaw: string;
-    mondayMenuRaw?: string; wednesdayMenuRaw?: string;
+    mondayMenuRaw?: string; wednesdayMenuRaw?: string; tuesdayMenuRaw?: string; thursdayMenuRaw?: string; fridayMenuRaw?: string;
   };
 }
 
@@ -92,8 +115,16 @@ export interface CombinedStats {
   newTeachers: number;
   matchedTeachers: number;
   mondayOrders: number;
+  tuesdayOrders: number;
+  thursdayOrders: number;
+  fridayOrders: number;
+
   wednesdayOrders: number;
   mondayConflicts: number;
+  tuesdayConflicts: number;
+  thursdayConflicts: number;
+  fridayConflicts: number;
+
   wednesdayConflicts: number;
   duplicates: number;
   errors: number;
@@ -193,7 +224,11 @@ export function analyzeCombined(
   ref: RefData,
   mondayKey: string,
   wednesdayKey: string,
+  extraKeys: Partial<Record<"tuesday" | "thursday" | "friday", string>> = {},
 ): { rows: AnalyzedRow[]; stats: CombinedStats } {
+  const tuesdayKey = extraKeys.tuesday || "";
+  const thursdayKey = extraKeys.thursday || "";
+  const fridayKey = extraKeys.friday || "";
   const ix = buildIndexes(ref);
   const seen = new Set<string>();
   const newTeacherKeys = new Set<string>();
@@ -201,13 +236,22 @@ export function analyzeCombined(
   const out: AnalyzedRow[] = [];
   let newStudents = 0, matchedStudents = 0, duplicates = 0, errors = 0;
   let mondayOrders = 0, wednesdayOrders = 0;
+  let tuesdayOrders = 0;
+  let thursdayOrders = 0;
+  let fridayOrders = 0;
   let mondayConflicts = 0, wednesdayConflicts = 0;
+  let tuesdayConflicts = 0;
+  let thursdayConflicts = 0;
+  let fridayConflicts = 0;
 
   rows.forEach((row, i) => {
     const name = cleanName(get(row, m.student_name ?? -1));
     const { gradeRaw, teacherRaw } = resolveGradeTeacher(row, m);
     const deliveryRaw = cleanName(get(row, m.delivery_time ?? -1));
     const mondayMenuRaw = cleanName(get(row, m.monday_meal ?? -1));
+    const tuesdayMenuRaw = cleanName(get(row, m.tuesday_meal ?? -1));
+    const thursdayMenuRaw = cleanName(get(row, m.thursday_meal ?? -1));
+    const fridayMenuRaw = cleanName(get(row, m.friday_meal ?? -1));
     const wednesdayMenuRaw = cleanName(get(row, m.wednesday_meal ?? -1));
     const issues: string[] = [];
 
@@ -233,17 +277,58 @@ export function analyzeCombined(
 
     // Menu item matching — fuzzy to tolerate minor name differences
     const mondayMenuMatch = mondayMenuRaw ? fuzzyFindMenu(mondayMenuRaw, ix.menuByNorm) : undefined;
+    const tuesdayMenuMatch = tuesdayMenuRaw ? fuzzyFindMenu(tuesdayMenuRaw, ix.menuByNorm) : undefined;
+    const thursdayMenuMatch = thursdayMenuRaw ? fuzzyFindMenu(thursdayMenuRaw, ix.menuByNorm) : undefined;
+    const fridayMenuMatch = fridayMenuRaw ? fuzzyFindMenu(fridayMenuRaw, ix.menuByNorm) : undefined;
     const wednesdayMenuMatch = wednesdayMenuRaw ? fuzzyFindMenu(wednesdayMenuRaw, ix.menuByNorm) : undefined;
+
+    if (mondayMenuRaw && !mondayKey) issues.push("No Monday date in the selected semester");
+    if (mondayMenuMatch && (!mondayMenuMatch.active || !mondayMenuMatch.days?.includes("Monday"))) issues.push("Selected meal is not available on Monday");
+    if (tuesdayMenuRaw && !tuesdayKey) issues.push("No Tuesday date in the selected semester");
+    if (tuesdayMenuMatch && (!tuesdayMenuMatch.active || !tuesdayMenuMatch.days?.includes("Tuesday"))) issues.push("Selected meal is not available on Tuesday");
+    if (wednesdayMenuRaw && !wednesdayKey) issues.push("No Wednesday date in the selected semester");
+    if (wednesdayMenuMatch && (!wednesdayMenuMatch.active || !wednesdayMenuMatch.days?.includes("Wednesday"))) issues.push("Selected meal is not available on Wednesday");
+    if (thursdayMenuRaw && !thursdayKey) issues.push("No Thursday date in the selected semester");
+    if (thursdayMenuMatch && (!thursdayMenuMatch.active || !thursdayMenuMatch.days?.includes("Thursday"))) issues.push("Selected meal is not available on Thursday");
+    if (fridayMenuRaw && !fridayKey) issues.push("No Friday date in the selected semester");
+    if (fridayMenuMatch && (!fridayMenuMatch.active || !fridayMenuMatch.days?.includes("Friday"))) issues.push("Selected meal is not available on Friday");
 
     // Conflict detection per day
     let mondayConflict = false, wednesdayConflict = false;
+    let tuesdayConflict = false;
+    let thursdayConflict = false;
+    let fridayConflict = false;
     let mondayExistingMealName: string | undefined, wednesdayExistingMealName: string | undefined;
+    let tuesdayExistingMealName: string | undefined;
+    let thursdayExistingMealName: string | undefined;
+    let fridayExistingMealName: string | undefined;
     if (studentMatch) {
       if (mondayMenuMatch) {
         const ex = ix.selByKey.get(`${studentMatch.id}|${mondayKey}`);
         if (ex) {
           mondayConflict = true;
           mondayExistingMealName = ix.menuById.get(ex.menu_item)?.name ?? "existing meal";
+        }
+      }
+      if (tuesdayMenuMatch) {
+        const ex = ix.selByKey.get(`${studentMatch.id}|${tuesdayKey}`);
+        if (ex) {
+          tuesdayConflict = true;
+          tuesdayExistingMealName = ix.menuById.get(ex.menu_item)?.name ?? "existing meal";
+        }
+      }
+      if (thursdayMenuMatch) {
+        const ex = ix.selByKey.get(`${studentMatch.id}|${thursdayKey}`);
+        if (ex) {
+          thursdayConflict = true;
+          thursdayExistingMealName = ix.menuById.get(ex.menu_item)?.name ?? "existing meal";
+        }
+      }
+      if (fridayMenuMatch) {
+        const ex = ix.selByKey.get(`${studentMatch.id}|${fridayKey}`);
+        if (ex) {
+          fridayConflict = true;
+          fridayExistingMealName = ix.menuById.get(ex.menu_item)?.name ?? "existing meal";
         }
       }
       if (wednesdayMenuMatch) {
@@ -272,12 +357,24 @@ export function analyzeCombined(
         mondayOrders++;
         if (mondayConflict) mondayConflicts++;
       }
+      if (tuesdayMenuMatch) {
+        tuesdayOrders++;
+        if (tuesdayConflict) tuesdayConflicts++;
+      }
+      if (thursdayMenuMatch) {
+        thursdayOrders++;
+        if (thursdayConflict) thursdayConflicts++;
+      }
+      if (fridayMenuMatch) {
+        fridayOrders++;
+        if (fridayConflict) fridayConflicts++;
+      }
       if (wednesdayMenuMatch) {
         wednesdayOrders++;
         if (wednesdayConflict) wednesdayConflicts++;
       }
       // "conflict" only when there's an actual existing order to resolve
-      const hasRealConflict = mondayConflict || wednesdayConflict;
+      const hasRealConflict = mondayConflict || wednesdayConflict || tuesdayConflict || thursdayConflict || fridayConflict;
       status = hasRealConflict ? "conflict" : (!studentMatch ? "new" : "matched");
     }
 
@@ -294,16 +391,36 @@ export function analyzeCombined(
       gradeNew,
       deliveryNew,
       mondayMenuName: mondayMenuRaw || undefined,
+      mondayMenuId: mondayMenuMatch?.id,
       mondayMenuMatched: !!mondayMenuMatch,
       mondayConflict: mondayConflict || undefined,
       mondayExistingMealName,
       mondayResolution: mondayConflict ? "replace" : undefined,
+      tuesdayMenuName: tuesdayMenuRaw || undefined,
+      tuesdayMenuId: tuesdayMenuMatch?.id,
+      tuesdayMenuMatched: !!tuesdayMenuMatch,
+      tuesdayConflict: tuesdayConflict || undefined,
+      tuesdayExistingMealName,
+      tuesdayResolution: tuesdayConflict ? "replace" : undefined,
+      thursdayMenuName: thursdayMenuRaw || undefined,
+      thursdayMenuId: thursdayMenuMatch?.id,
+      thursdayMenuMatched: !!thursdayMenuMatch,
+      thursdayConflict: thursdayConflict || undefined,
+      thursdayExistingMealName,
+      thursdayResolution: thursdayConflict ? "replace" : undefined,
+      fridayMenuName: fridayMenuRaw || undefined,
+      fridayMenuId: fridayMenuMatch?.id,
+      fridayMenuMatched: !!fridayMenuMatch,
+      fridayConflict: fridayConflict || undefined,
+      fridayExistingMealName,
+      fridayResolution: fridayConflict ? "replace" : undefined,
       wednesdayMenuName: wednesdayMenuRaw || undefined,
+      wednesdayMenuId: wednesdayMenuMatch?.id,
       wednesdayMenuMatched: !!wednesdayMenuMatch,
       wednesdayConflict: wednesdayConflict || undefined,
       wednesdayExistingMealName,
       wednesdayResolution: wednesdayConflict ? "replace" : undefined,
-      raw: { name, gradeRaw, teacherRaw, deliveryRaw, mondayMenuRaw, wednesdayMenuRaw },
+      raw: { name, gradeRaw, teacherRaw, deliveryRaw, mondayMenuRaw, wednesdayMenuRaw, tuesdayMenuRaw, thursdayMenuRaw, fridayMenuRaw },
     });
   });
 
@@ -313,8 +430,8 @@ export function analyzeCombined(
     newStudents, matchedStudents,
     newTeachers: newTeacherKeys.size,
     matchedTeachers: matchedTeacherIds.size,
-    mondayOrders, wednesdayOrders,
-    mondayConflicts, wednesdayConflicts,
+    mondayOrders, wednesdayOrders, tuesdayOrders, thursdayOrders, fridayOrders,
+    mondayConflicts, wednesdayConflicts, tuesdayConflicts, thursdayConflicts, fridayConflicts,
     duplicates, errors,
     menuCount: ref.menu.length,
   };

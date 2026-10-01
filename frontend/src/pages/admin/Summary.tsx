@@ -1,3 +1,4 @@
+import { WEEKDAYS, type Weekday } from "../../lib/semester";
 import { useEffect, useMemo, useState } from "react";
 import { Sigma, Printer, Download } from "lucide-react";
 import pb from "../../lib/pocketbase";
@@ -8,7 +9,7 @@ import { useSemester } from "../../lib/SemesterContext";
 import { toCsv, downloadFile } from "../../lib/csv";
 import type { MealSelection as Sel, DeliveryTime } from "../../lib/types";
 
-type Weekday = "Monday" | "Wednesday";
+
 
 /** OR-combines dayFilters for every occurrence of a given weekday in the semester. */
 function weekdayFilter(field: string, weekday: Weekday, days: ReturnType<typeof lunchDates>): string {
@@ -98,8 +99,7 @@ export default function Summary() {
       <Card className="mb-4 p-4">
         <div className="max-w-xs">
           <Select value={weekday} onChange={(e) => setWeekday(e.target.value as Weekday)}>
-            <option value="Monday">Monday</option>
-            <option value="Wednesday">Wednesday</option>
+            {WEEKDAYS.map(day => <option key={day} value={day}>{day}</option>)}
           </Select>
         </div>
       </Card>

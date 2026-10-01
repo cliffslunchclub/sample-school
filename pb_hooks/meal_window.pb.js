@@ -1,6 +1,6 @@
 // Enforces the parent ordering window server-side.
 // Parents may only create/change meal selections Thursday 00:00 -> Friday 23:59
-// (local server time), and only for the upcoming week's Monday and Wednesday.
+// (local server time), and only for the upcoming week's Monday through Friday.
 // Admins bypass this entirely.
 
 onRecordCreateRequest((e) => {
@@ -15,12 +15,11 @@ onRecordCreateRequest((e) => {
     const fmt = (d) => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate())
     const daysUntilMon = (8 - dow) % 7 // Thu -> 4, Fri -> 3
     const mon = new Date(now); mon.setHours(0, 0, 0, 0); mon.setDate(mon.getDate() + daysUntilMon)
-    const wed = new Date(mon); wed.setDate(mon.getDate() + 2)
-    const allowed = [fmt(mon), fmt(wed)]
+    const allowed = [0, 1, 2, 3, 4].map((i) => { const d = new Date(mon); d.setDate(mon.getDate() + i); return fmt(d) })
     const ld = e.record.getString("lunch_date")
     const key = ld ? ld.substring(0, 10) : ""
     if (allowed.indexOf(key) === -1) {
-      throw new BadRequestError("Parents can only order for the upcoming Monday and Wednesday.")
+      throw new BadRequestError("Parents can only order for the upcoming Monday through Friday.")
     }
   }
   e.next()
@@ -38,12 +37,11 @@ onRecordUpdateRequest((e) => {
     const fmt = (d) => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate())
     const daysUntilMon = (8 - dow) % 7
     const mon = new Date(now); mon.setHours(0, 0, 0, 0); mon.setDate(mon.getDate() + daysUntilMon)
-    const wed = new Date(mon); wed.setDate(mon.getDate() + 2)
-    const allowed = [fmt(mon), fmt(wed)]
+    const allowed = [0, 1, 2, 3, 4].map((i) => { const d = new Date(mon); d.setDate(mon.getDate() + i); return fmt(d) })
     const ld = e.record.getString("lunch_date")
     const key = ld ? ld.substring(0, 10) : ""
     if (allowed.indexOf(key) === -1) {
-      throw new BadRequestError("Parents can only order for the upcoming Monday and Wednesday.")
+      throw new BadRequestError("Parents can only order for the upcoming Monday through Friday.")
     }
   }
   e.next()

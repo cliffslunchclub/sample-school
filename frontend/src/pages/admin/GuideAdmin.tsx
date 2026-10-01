@@ -58,7 +58,7 @@ export default function GuideAdmin() {
           <p className="mb-3 text-sm text-ink-soft">See total meal counts broken down by delivery time — perfect for kitchen prep.</p>
           <Steps steps={[
             'Go to "Order Summary" in the sidebar.',
-            "Choose Monday or Wednesday from the dropdown.",
+            "Choose any weekday from the dropdown.",
             "The table shows every menu item with a count per delivery time slot.",
             'Click "CSV" to download the summary, or "Print" to print it.',
           ]} />
@@ -132,7 +132,7 @@ export default function GuideAdmin() {
             "Resolve any conflicts (if a student already has an order, choose to overwrite or keep it).",
             'Click "Confirm Import" to save everything.',
           ]} />
-          <Note>The system imports into the next upcoming Monday and Wednesday automatically — no date selection needed.</Note>
+          <Note>The system imports into the next upcoming Monday through Friday automatically — no date selection needed.</Note>
         </Section>
 
         {/* Section 10 */}
@@ -151,6 +151,14 @@ export default function GuideAdmin() {
             Useful for tracking manual edits or troubleshooting unexpected changes.
           </p>
         </Section>
+
+        <Section number="12" title="Administrators">
+          <p className="text-sm text-ink-soft">Open Administrators and choose Create admin. Enter the staff member's name, email and a password of at least 12 characters. Share the login directly; the new account uses Admin Login.</p>
+        </Section>
+        <Section number="13" title="Lunch Labels">
+          <p className="text-sm text-ink-soft">Choose the lunch date, include summary labels if needed, and generate labels. Open Preview / Print / Save PDF, then print on 1 × 2⅝ inch, 30-per-sheet Letter stock at 100% with headers and footers off. Student labels use new rows for menu or time changes, with no blank separator rows; chicken wraps stay together. Two menu summary sets include extra cheeseburger slider and chicken nugget copies.</p>
+        </Section>
+
 
         {/* Quick reference */}
         <div className="mt-8 rounded-xl bg-leaf-50 px-6 py-5 break-inside-avoid">

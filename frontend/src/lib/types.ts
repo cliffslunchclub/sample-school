@@ -1,3 +1,4 @@
+import type { Weekday } from "./semester";
 export type Role = "parent" | "admin";
 
 export interface UserRecord {
@@ -37,7 +38,7 @@ export interface MenuItem {
   name: string;
   description: string;
   active: boolean;
-  days: ("Monday" | "Wednesday")[];
+  days: Weekday[];
 }
 
 export interface DeliveryTime {

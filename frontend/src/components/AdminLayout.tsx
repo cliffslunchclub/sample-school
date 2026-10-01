@@ -14,6 +14,8 @@ const nav = [
   { to: "/admin/orders",         label: "Orders",          icon: Table2 },
   { to: "/admin/summary",        label: "Order Summary",   icon: Sigma },
   { to: "/admin/students",       label: "Students",        icon: GraduationCap },
+  { to: "/admin/labels", label: "Lunch Labels", icon: Table2 },
+  { to: "/admin/admins", label: "Administrators", icon: Users2 },
   { to: "/admin/parents",        label: "Parents",         icon: Users2 },
   { to: "/admin/menu",           label: "Menu",            icon: UtensilsCrossed },
   { to: "/admin/grades",         label: "Grades & Teachers", icon: School },

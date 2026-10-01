@@ -1,21 +1,27 @@
-// Monday/Wednesday lunch schedule — driven by semester dates stored in DB.
+// Monday–Friday lunch schedule — driven by semester dates stored in DB.
 // All functions accept optional start/end overrides; the constants below are
 // compile-time fallbacks used before the DB value is loaded.
 
 export const SEMESTER_START = "2026-09-14";
 export const SEMESTER_END   = "2026-11-11";
 
+export const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"] as const;
+export type Weekday = typeof WEEKDAYS[number];
+export function weekdayOf(key: string): Weekday {
+  return WEEKDAYS[new Date(key.slice(0, 10) + "T12:00:00Z").getUTCDay() - 1];
+}
+
 export interface LunchDate {
   iso: string;     // canonical noon-UTC ISO, stored on meal_selections.lunch_date
   key: string;     // YYYY-MM-DD
-  weekday: "Monday" | "Wednesday";
+  weekday: Weekday;
 }
 
 function pad(n: number): string {
   return n < 10 ? "0" + n : "" + n;
 }
 
-/** Every Monday and Wednesday within the semester range, in order. */
+/** Every weekday within the semester range, in order. */
 export function lunchDates(
   start: string = SEMESTER_START,
   end:   string = SEMESTER_END,
@@ -28,9 +34,9 @@ export function lunchDates(
   while (cur <= endMs) {
     const d = new Date(cur);
     const dow = d.getUTCDay();
-    if (dow === 1 || dow === 3) {
+    if (dow >= 1 && dow <= 5) {
       const key = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
-      out.push({ iso: `${key}T12:00:00.000Z`, key, weekday: dow === 1 ? "Monday" : "Wednesday" });
+      out.push({ iso: `${key}T12:00:00.000Z`, key, weekday: WEEKDAYS[dow - 1] });
     }
     cur += 86400000;
   }
@@ -54,24 +60,25 @@ export function dayFilter(field: string, key: string): string {
 
 export interface OrderWindow {
   open: boolean;
-  keys: string[]; // [upcoming Monday key, upcoming Wednesday key]
+  keys: string[]; // upcoming Monday–Friday keys
 }
 
 /**
  * Parent ordering window: open Thursday–Friday, targeting next week's
- * Monday & Wednesday.
+ * Monday through Friday.
  */
 export function orderingWindow(now: Date = new Date()): OrderWindow {
-  const dow = now.getDay(); // 0 Sun … 6 Sat
+  // Interpret ordering deadlines in the school timezone, regardless of the Mac timezone.
+  const schoolNow = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
+  const dow = schoolNow.getDay(); // 0 Sun … 6 Sat
   const open = dow === 4 || dow === 5;
   const daysUntilMon = (8 - dow) % 7; // Thu→4, Fri→3
-  const mon = new Date(now);
+  const mon = new Date(schoolNow);
   mon.setHours(0, 0, 0, 0);
   mon.setDate(mon.getDate() + daysUntilMon);
-  const wed = new Date(mon);
-  wed.setDate(mon.getDate() + 2);
+
   const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  return { open, keys: [fmt(mon), fmt(wed)] };
+  return { open, keys: WEEKDAYS.map((_, i) => { const d = new Date(mon); d.setDate(mon.getDate() + i); return fmt(d); }) };
 }
 
 /** The lunch dates a parent can currently edit (window open + within semester). */

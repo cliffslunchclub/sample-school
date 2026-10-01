@@ -4,6 +4,8 @@ import pb from "../../lib/pocketbase";
 import { Spinner } from "../../components/ui";
 import type { MenuItem } from "../../lib/types";
 
+import { WEEKDAYS } from "../../lib/semester";
+
 export default function ParentMenu() {
   const [items, setItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -16,21 +18,19 @@ export default function ParentMenu() {
 
   if (loading) return <Spinner label="Loading menu…" />;
 
-  const monday    = items.filter((m) => m.days?.includes("Monday"));
-  const wednesday = items.filter((m) => m.days?.includes("Wednesday"));
+
 
   return (
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold text-ink">This Week's Menu</h1>
         <p className="mt-1 text-sm text-ink-soft">
-          Fresh meals served every Monday and Wednesday.
+          Fresh meals served Monday through Friday.
         </p>
       </div>
 
       <div className="space-y-8">
-        <DaySection day="Monday" items={monday} />
-        <DaySection day="Wednesday" items={wednesday} />
+        {WEEKDAYS.map(day => <DaySection key={day} day={day} items={items.filter(m => m.days?.includes(day))} />)}
       </div>
 
       {items.length === 0 && (

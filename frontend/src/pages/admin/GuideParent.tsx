@@ -44,7 +44,7 @@ export default function GuideParent() {
           <p className="mb-3 text-ink-soft">See what's being served before you make any selections.</p>
           <Steps steps={[
             'Click the "Menu" tab at the top of the page.',
-            "Browse all available meals — organized by Monday and Wednesday.",
+            "Browse all available meals — organized by Monday through Friday.",
             "Each meal shows its name and a description.",
           ]} />
           <Note>The menu is set by the school. If you have questions about ingredients or allergens, please contact the school directly.</Note>
@@ -66,16 +66,16 @@ export default function GuideParent() {
 
         {/* Section 4 */}
         <Section number="4" title="Selecting Meals">
-          <p className="mb-3 text-ink-soft">Choose what your child will eat each Monday and Wednesday.</p>
+          <p className="mb-3 text-ink-soft">Choose what your child will eat each Monday through Friday.</p>
           <Steps steps={[
             'Click the "Meal Selection" tab.',
-            "You'll see your children listed with dropdowns for Monday and Wednesday.",
+            "You'll see your children listed with dropdowns for Monday through Friday.",
             "Pick a meal for each day from the menu options.",
             'Click "Save selections" to confirm your choices.',
           ]} />
           <Highlight title="When can I order?">
             The ordering window opens every <strong>Thursday</strong> and closes at the end of <strong>Friday</strong>.
-            During this time you can choose meals for the following Monday and Wednesday.
+            During this time you can choose meals for the following Monday through Friday.
             Outside this window, selections are locked.
           </Highlight>
           <Note>Changed your mind? You can update your selections as many times as you like while the window is open. Just come back and save again.</Note>
@@ -86,7 +86,7 @@ export default function GuideParent() {
           <p className="mb-3 text-ink-soft">Check what's been ordered for each of your children.</p>
           <Steps steps={[
             'Click the "My Orders" tab.',
-            "You'll see all your confirmed meal selections, organized by Monday and Wednesday.",
+            "You'll see all your confirmed meal selections, organized by Monday through Friday.",
             'Orders marked "Editable" can still be changed (the ordering window is open).',
             'Orders marked "Locked" are confirmed and will be delivered.',
           ]} />

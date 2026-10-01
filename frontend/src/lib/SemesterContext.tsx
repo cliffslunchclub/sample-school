@@ -29,8 +29,7 @@ export function SemesterProvider({ children }: { children: ReactNode }) {
   });
 
   const load = useCallback(() => {
-    pb.collection("settings")
-      .getFirstListItem("id != ''", { requestKey: null })
+    pb.send<{id:string; semester_start:string; semester_end:string}>("/api/school-calendar", {method:"GET", requestKey:null})
       .then((rec) => {
         setData({
           start:      rec.semester_start ? rec.semester_start.slice(0, 10) : SEMESTER_START,
