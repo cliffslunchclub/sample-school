@@ -1,5 +1,5 @@
 # Future Updates
 
-## Admin workflow
+## Completed in version 1.2.2
 
-- Add a menu item upload workflow that is separate from order uploads. Admins should be able to upload or update menu items without using the order import flow.
+- Added a menu item CSV upload separate from order imports, with a downloadable template, preview, explicit existing-item updates, and no implicit deletion.
