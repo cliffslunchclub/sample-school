@@ -2,7 +2,7 @@
 
 ## Planned
 
-- Add an optional menu-item label print feature, separate from student lunch labels.
+- Add an optional menu-item label print option on the Menu tab, separate from student lunch labels.
 
 ## Completed in version 1.2.2
 
