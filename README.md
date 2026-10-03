@@ -2,13 +2,13 @@
 
 One codebase, two SiteGround frontends and one shared PocketHost backend. Each school has separate accounts, students, orders, menus, settings and audit history, enforced by backend permissions and relation validation. See [DEPLOYMENT.md](DEPLOYMENT.md).
 
-## Current version — 1.2.1 (October 3, 2026)
+## Current version — 1.2.2 (October 3, 2026)
 
 This version supports Monday–Friday meals, configurable meal selection days, creating school admins, separate admin/parent audit logs and student-only lunch labels. Built-in Parent Guide and Admin Guide are updated for these workflows, use the current site address and ordering settings, and can be printed or saved as PDF.
 
 Version 1.2.0 adds school-scoped login/registration, backend school isolation, and school-aware email. Both frontend builds use the same backend URL with different school slugs. No hosting account or live domain is changed by updating this repository. Shared backend upgrades affect both schools; use maintenance and test before uploading.
 
-Version 1.2.1 uses paced, transactional PocketBase batches for large roster-and-meal CSV imports and admin purges to reduce requests and avoid hosted API rate limits. Enable the PocketBase Batch API once before using either feature; see [DEPLOYMENT.md](DEPLOYMENT.md).
+Version 1.2.1 uses paced, transactional PocketBase batches for large roster-and-meal CSV imports and admin purges. Version 1.2.2 adds a separate menu CSV upload with a downloadable template, preview, safe default handling for existing items, and explicit confirmation. The PocketBase Batch API must be enabled for menu uploads, imports and purge.
 
 ## Start on your Mac
 
