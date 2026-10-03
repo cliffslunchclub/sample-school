@@ -17,7 +17,7 @@ import {
   COMBINED_FIELDS, loadRefData, analyzeCombined,
   type Mapping, type RefData, type AnalyzedRow, type CombinedStats,
 } from "../../lib/importAnalyze";
-import { executeCombined, type ExecResult } from "../../lib/importExecute";
+import { executeCombined, ImportExecutionError, type ExecResult } from "../../lib/importExecute";
 
 type Step = "upload" | "map" | "preview" | "result";
 type Parsed = { headers: string[]; rows: string[][] };
@@ -185,8 +185,18 @@ export default function ImportData() {
       setResult(r);
       setStep("result");
       loadHistory();
-    } catch {
-      toast("Import failed. No further changes were saved.", "error");
+    } catch (error) {
+      if (error instanceof ImportExecutionError) {
+        const progress = error.batchesCommitted > 0
+          ? ` ${error.batchesCommitted} earlier batches may already be saved.`
+          : "";
+        const batchHelp = error.message.includes("Batch requests are not allowed")
+          ? " Enable the PocketBase Batch API in Dashboard → Settings → Application."
+          : "";
+        toast(`Import stopped during ${error.stage}.${progress} Refresh the import data before retrying.${batchHelp}`, "error");
+      } else {
+        toast("Import stopped. Some records may already be saved. Refresh the import data before retrying.", "error");
+      }
     } finally {
       setBusy(false);
     }
