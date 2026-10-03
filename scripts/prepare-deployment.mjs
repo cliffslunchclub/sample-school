@@ -22,8 +22,8 @@ if (api.protocol !== 'https:' || api.username || api.password || api.search || a
   throw new Error('Use the public HTTPS backend origin, without credentials, paths or query parameters.');
 }
 const profiles = {
-  sample: { domain: 'sampleschool.cliffslunchclub.com', school: 'Sample Elementary School' },
-  chs: { domain: 'chs.cliffslunchclub.com', school: 'Cherry Hill Elementary' },
+  sample: { domain: 'sampleschool.cliffslunchclub.com', school: 'Sample Elementary School', title: 'Sample School Lunch Dashboard via Cliffs Lunch Club' },
+  chs: { domain: 'chs.cliffslunchclub.com', school: 'Cherry Hill Elementary', title: 'Cherry Hill School Lunch via Cliffs Lunch Club' },
 };
 const profile = profiles[target];
 const base = path.join(root, '.deploy');
@@ -53,6 +53,8 @@ try {
   });
   if (result.error || result.status !== 0) throw new Error('Frontend build failed; install dependencies with npm ci in frontend first.');
   cpSync(path.join(root, 'frontend/dist'), site, { recursive: true });
+  const indexFile = path.join(site, 'index.html');
+  writeFileSync(indexFile, readFileSync(indexFile, 'utf8').replace(/<title>[^<]*<\/title>/, `<title>${profile.title}</title>`));
   writeFileSync(path.join(site, '.htaccess'), '<IfModule mod_rewrite.c>\nRewriteEngine On\nRewriteCond %{REQUEST_FILENAME} !-f\nRewriteCond %{REQUEST_FILENAME} !-d\nRewriteRule ^ index.html [L]\n</IfModule>\n');
   // Same source digest across target packages proves both were prepared from the
   // same code, even though their public API URLs and installation profiles differ.
