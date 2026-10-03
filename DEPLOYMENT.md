@@ -54,15 +54,15 @@ In the PocketBase superuser dashboard:
 
 Actual SMTP credentials and inbox delivery must be tested before inviting parents. Mail support in code does not configure a provider account.
 
-## Enable larger CSV imports
+## Enable batch operations for imports and purge
 
-The combined CSV importer sends PocketBase transactional batches of up to 40 record writes. Enable the Batch API once on the shared PocketBase instance before importing a large roster:
+The combined CSV importer and Settings purge send PocketBase transactional batches of up to 40 record changes. Enable the Batch API once on the shared PocketBase instance before using either feature:
 
 1. Sign in to the PocketBase superuser dashboard.
 2. Open **Settings → Application → Batch API** and enable it.
 3. Set **Max requests** to at least `40`. Keep the configured body-size and processing-time limits as low as the host allows; each request contains ordinary school records, not files.
 
-Each batch is transactional. If a batch fails, that batch rolls back. The full import uses several batches for record dependencies, so batches completed earlier can remain saved. The import screen reports this and advises refreshing before retrying. Re-importing after a partial attempt will analyze the saved records and let the admin keep or replace existing meals.
+Each batch is transactional. If a batch fails, that batch rolls back. Imports and purges use several batches for record dependencies, so earlier completed batches can remain saved. The import screen reports this and advises refreshing before retrying. Purge reports how many records were deleted in completed batches; refresh counts and inspect the selected records before trying again.
 
 ## Updates and recovery
 
