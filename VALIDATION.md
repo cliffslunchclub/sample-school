@@ -58,3 +58,9 @@ Version 1.1.0 verified:
 - Local PocketBase integration verifies a school admin can create and delete records through a batch and a cross-school failure rolls back earlier writes in the same batch.
 - `npm test`, the frontend TypeScript check, production build and shared-school/SMTP integration pass. Vite build needs `SWC_NATIVE_BINDING_CACHE` set to a writable cache directory in this restricted environment.
 - The PocketBase Batch API must be enabled once in the shared instance's superuser Settings → Application for imports and purge; no live hosted records or settings were changed here.
+
+## Version 1.2.2 menu CSV upload
+
+- Menu CSV parsing handles quoted commas, escaped quotes, BOMs, and embedded line breaks. Validation requires a menu name and all five weekday columns, checks Yes/No values and duplicates, and previews new, unchanged, conflicting, and invalid rows.
+- Existing menu matches default to Keep Existing; admins can explicitly choose Update. Omitted records are never changed or deleted. Confirmed writes use the shared transactional batch helper and carry the signed-in school's ID for new records.
+- Regression tests cover CSV quoting, new/existing/conflict matching, explicit updates, school assignment, and invalid weekday values. Disposable PocketBase integration verifies menu records can be created and updated through a school-scoped batch.
