@@ -46,6 +46,7 @@ with tempfile.TemporaryDirectory(prefix='clc-isolation-') as tmp:
   sa=login('admin@example.test','LocalLunch2026!')['token'];sp=login('parent@example.test','LocalLunch2026!');pt=sp['token']
   ca=create('users',{'email':'chs-admin@example.test','password':PASSWORD,'passwordConfirm':PASSWORD,'role':'admin','active':True,'verified':True,'school':chs},su)
   ct=login(ca['email'],slug='chs')['token']
+  ok('/api/settings',{'batch':{'enabled':True,'maxRequests':40,'timeout':5,'maxBodySize':1000000}},su,method='PATCH')
   for email,password,wrong in [('admin@example.test','LocalLunch2026!','chs'),(ca['email'],PASSWORD,'sample')]:denied('/api/collections/users/auth-with-password',{'identity':email,'password':password},slug=wrong)
   denied('/api/collections/users/auth-with-password',{'identity':ca['email'],'password':PASSWORD},slug='')
   config=rows('settings',ct,'chs')[0]
@@ -56,6 +57,16 @@ with tempfile.TemporaryDirectory(prefix='clc-isolation-') as tmp:
   m=create('menu_items',{'name':'CHS Meal','school':chs,'active':True,'days':['Monday','Tuesday','Wednesday','Thursday','Friday']},ct,'chs')
   d=create('delivery_time_slots',{'label':'12:00','school':chs,'active':True},ct,'chs')
   rule=create('delivery_rules',{'grade':g['id'],'teacher':t['id'],'delivery_time':d['id'],'school':chs},ct,'chs')
+  batch=ok('/api/batch',{'requests':[
+   {'method':'POST','url':'/api/collections/students/records','body':{'name':'Batch Student One','grade':g['id'],'teacher':t['id'],'school':chs,'active':True}},
+   {'method':'POST','url':'/api/collections/students/records','body':{'name':'Batch Student Two','grade':g['id'],'teacher':t['id'],'school':chs,'active':True}},
+  ]},ct,'chs')
+  assert len(batch)==2 and all(item['status']==200 and item['body']['school']==chs for item in batch)
+  denied('/api/batch',{'requests':[
+   {'method':'POST','url':'/api/collections/students/records','body':{'name':'Must Roll Back','grade':g['id'],'teacher':t['id'],'school':chs,'active':True}},
+   {'method':'POST','url':'/api/collections/students/records','body':{'name':'Cross School','school':sample,'grade':g['id'],'teacher':t['id'],'active':True}},
+  ]},ct,'chs')
+  assert not any(student['name']=='Must Roll Back' for student in rows('students',ct,'chs')),'failed batch should roll back earlier operations'
   st=create('students',{'name':'CHS Student','grade':g['id'],'teacher':t['id'],'parent':cp['record']['id'],'school':chs,'active':True},cpt,'chs')
   all_days=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
   for tok,slug in [(sa,'sample'),(ct,'chs')]:
@@ -88,7 +99,7 @@ with tempfile.TemporaryDirectory(prefix='clc-isolation-') as tmp:
   denied('/api/collections/meal_selections/records',{'school':chs,'student':st['id'],'parent':cp['record']['id'],'menu_item':foreign_menu['id'],'lunch_date':str(monday)},ct,'chs')
   newadmin=ok('/api/admin/accounts',{'first_name':'New','last_name':'Admin','email':'new-chs@example.test','password':PASSWORD,'school':sample},ct,'chs');assert ok('/api/collections/users/records/'+newadmin['id'],token=ct,slug='chs')['school']==chs
   assert ok('/api/school-calendar',token=ct,slug='chs')['id']==config['id']
-  print('PASS existing records preserved; login/registration school selection; both-direction list/view/update/delete isolation across 12 collections; cross-school create/relations; parent audit transaction/no-op; school and role reassignment blocked; school-specific custom routes')
+  print('PASS existing records preserved; login/registration school selection; both-direction list/view/update/delete isolation across 12 collections; school-scoped batch create and rollback; cross-school create/relations; parent audit transaction/no-op; school and role reassignment blocked; school-specific custom routes')
   # Capture actual SMTP messages locally; never sends mail to real addresses.
   messages=[]
   class SMTP(socketserver.StreamRequestHandler):
