@@ -8,7 +8,7 @@ This version supports Monday–Friday meals, configurable meal selection days, c
 
 Version 1.2.0 adds school-scoped login/registration, backend school isolation, and school-aware email. Both frontend builds use the same backend URL with different school slugs. No hosting account or live domain is changed by updating this repository. Shared backend upgrades affect both schools; use maintenance and test before uploading.
 
-Version 1.2.1 changes large roster-and-meal CSV imports to transactional PocketBase batches to reduce requests and avoid hosted API rate limits. Enable the PocketBase Batch API once before using large imports; see [DEPLOYMENT.md](DEPLOYMENT.md).
+Version 1.2.1 uses paced, transactional PocketBase batches for large roster-and-meal CSV imports and admin purges to reduce requests and avoid hosted API rate limits. Enable the PocketBase Batch API once before using either feature; see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Start on your Mac
 
