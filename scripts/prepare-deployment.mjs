@@ -22,8 +22,8 @@ if (api.protocol !== 'https:' || api.username || api.password || api.search || a
   throw new Error('Use the public HTTPS backend origin, without credentials, paths or query parameters.');
 }
 const profiles = {
-  sample: { domain: 'sampleschool.cliffslunchclub.com', school: 'Sample Elementary School', demo: true },
-  chs: { domain: 'chs.cliffslunchclub.com', school: 'Cherry Hill Elementary', demo: false },
+  sample: { domain: 'sampleschool.cliffslunchclub.com', school: 'Sample Elementary School' },
+  chs: { domain: 'chs.cliffslunchclub.com', school: 'Cherry Hill Elementary' },
 };
 const profile = profiles[target];
 const base = path.join(root, '.deploy');
@@ -36,20 +36,20 @@ try {
   const backend = path.join(staging, 'pockethost');
   mkdirSync(backend);
   for (const folder of ['pb_hooks', 'pb_migrations']) cpSync(path.join(root, folder), path.join(backend, folder), { recursive: true });
-  // Bake the profile into fresh-install seeds: a missing host environment variable
-  // must never create sample accounts on Cherry Hill. Existing migrations stay applied.
+  // Both frontend targets use exactly the same shared backend. Fresh instances
+  // contain sample data and an empty CHS school; existing migrations stay applied.
   for (const filename of readdirSync(path.join(backend, 'pb_migrations'))) {
     const file = path.join(backend, 'pb_migrations', filename);
     let source = readFileSync(file, 'utf8');
-    source = source.replaceAll('$os.getenv("CLIFFS_SEED_DEMO") !== "false"', String(profile.demo));
-    source = source.replace('$os.getenv("CLIFFS_SCHOOL_NAME") || "Cliffs Elementary"', JSON.stringify(profile.school));
+    source = source.replaceAll('$os.getenv("CLIFFS_SEED_DEMO") !== "false"', "true");
+    source = source.replace('$os.getenv("CLIFFS_SCHOOL_NAME") || "Cliffs Elementary"', JSON.stringify(profiles.sample.school));
     writeFileSync(file, source);
   }
-  // Mail is suppressed for local/sample only. CHS must configure SMTP before launch.
-  if (!profile.demo) rmSync(path.join(backend, 'pb_hooks/local_email.pb.js'));
+  // School-aware mail is off by default; CHS must configure SMTP before launch.
+  // School-aware mail policy is included in every target package.
   const result = spawnSync('npm', ['run', 'build'], {
     cwd: path.join(root, 'frontend'), stdio: 'inherit',
-    env: { ...process.env, VITE_POCKETBASE_URL: api.origin, VITE_BRAND_NAME: 'Cliffs Lunch Club' },
+    env: { ...process.env, VITE_POCKETBASE_URL: api.origin, VITE_BRAND_NAME: 'Cliffs Lunch Club', VITE_SCHOOL_SLUG: target },
   });
   if (result.error || result.status !== 0) throw new Error('Frontend build failed; install dependencies with npm ci in frontend first.');
   cpSync(path.join(root, 'frontend/dist'), site, { recursive: true });
@@ -68,10 +68,10 @@ try {
   }
   for (const folder of ['frontend', 'pb_hooks', 'pb_migrations', 'scripts']) digest(folder);
   hash.update(readFileSync(path.join(root, 'package.json')));
-  const manifest = { target, version, source_sha256: hash.digest('hex'), frontend_domain: profile.domain, backend_url: api.origin, seed_demo: profile.demo, pocketbase_tested_version: '0.28.4' };
+  const manifest = { target, version, source_sha256: hash.digest('hex'), frontend_domain: profile.domain, backend_url: api.origin, school_slug: target, backend_mode: "shared", seed_demo: true, pocketbase_tested_version: '0.28.4' };
   writeFileSync(path.join(staging, 'release.json'), JSON.stringify(manifest, null, 2) + '\n');
   writeFileSync(path.join(site, 'release.json'), JSON.stringify(manifest, null, 2) + '\n');
-  writeFileSync(path.join(backend, 'pb_hooks/release.js'), 'module.exports = ' + JSON.stringify({ target, version, source_sha256: manifest.source_sha256 }) + '\n');
+  writeFileSync(path.join(backend, 'pb_hooks/release.js'), 'module.exports = ' + JSON.stringify({ target: "shared", version, source_sha256: manifest.source_sha256 }) + '\n');
   mkdirSync(path.dirname(destination), { recursive: true });
   renameSync(staging, destination);
   console.log(`\nPrepared ${destination}\nUpload siteground contents to the frontend document root (including .htaccess).\nUpload pockethost/pb_hooks and pockethost/pb_migrations to the matching backend.\nNo database, passwords or hosting keys are included. See DEPLOYMENT.md.`);

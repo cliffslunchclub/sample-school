@@ -1,12 +1,12 @@
 # Cliffs school app
 
-One codebase for separate school installations, with local development and deployment packages for SiteGround frontends and PocketHost backends. See [DEPLOYMENT.md](DEPLOYMENT.md) for sample-first releases and later REDACTED SCHOOL promotion. The interface is the same on both domains; databases and school settings stay separate.
+One codebase, two SiteGround frontends and one shared PocketHost backend. Each school has separate accounts, students, orders, menus, settings and audit history, enforced by backend permissions and relation validation. See [DEPLOYMENT.md](DEPLOYMENT.md).
 
-## Current version — 1.1.0 (October 1, 2026)
+## Current version — 1.2.0 (October 3, 2026)
 
 This version supports Monday–Friday meals, configurable meal selection days, creating school admins, separate admin/parent audit logs and student-only lunch labels. Built-in Parent Guide and Admin Guide are updated for these workflows, use the current site address and ordering settings, and can be printed or saved as PDF.
 
-Deployment packages support the sample site on SiteGround + PocketHost and a separate REDACTED SCHOOL template. No hosting account or live domain is deployed by updating this repository. Test each release on the sample before promoting the same source version to REDACTED SCHOOL.
+Version 1.2.0 adds school-scoped login/registration, backend school isolation, and school-aware email. Both frontend builds use the same backend URL with different school slugs. No hosting account or live domain is changed by updating this repository. Shared backend upgrades affect both schools; use maintenance and test before uploading.
 
 ## Start on your Mac
 
@@ -34,7 +34,7 @@ School registration code: DEMO2026
 | Michael Davis | parent3@example.test | Sophia Davis, Lucas Davis, Mia Davis |
 | Sarah Wilson | parent4@example.test | Ella Wilson, Ethan Wilson, Liam Wilson |
 
-All demo parent accounts use `LocalLunch2026!`. There are four demo families and 11 students. New sample/local installs seed a randomly selected available meal for every active demo student on each Monday–Friday date in the configured semester, with delivery times based on class rules. For the default September 14–November 11, 2026 semester, this is 43 service dates and 473 orders. Existing saved selections are preserved, and this migration runs once rather than rerandomizing on startup. Seed orders do not fabricate parent audit entries. REDACTED SCHOOL deployment packages disable all demo seeds.
+All demo parent accounts use `LocalLunch2026!`. There are four demo families and 11 students. New sample/local installs seed a randomly selected available meal for every active demo student on each Monday–Friday date in the configured semester, with delivery times based on class rules. For the default September 14–November 11, 2026 semester, this is 43 service dates and 473 orders. Existing saved selections are preserved, and this migration runs once rather than rerandomizing on startup. Seed orders do not fabricate parent audit entries. The shared backend keeps this sample data and adds an empty Cherry Hill school/settings record. It creates no Cherry Hill demo accounts, students or orders.
 
 These guides are built into the admin sidebar as Parent Guide and Admin Guide; use their Print / Save as PDF button when distributing instructions.
 
@@ -42,7 +42,7 @@ Use the app's Admin Login for the admin account. On a fresh checkout, PocketBase
 
 You can open the ordering window in Admin Settings when testing. Semester dates and deadlines from the export may otherwise prevent ordering. Create sample orders through the parent interface and compare them with the admin summary/CSV export.
 
-Outgoing email is suppressed by pb_hooks/local_email.pb.js. Password-reset/email delivery flows cannot be fully tested in this package. The sample deployment keeps this hook; the CHS package omits it and requires SMTP setup.
+Outgoing user email is disabled by default. Sample user email stays blocked. A PocketBase superuser can enable Cherry Hill email after SMTP setup; password-reset links use the trusted school frontend origin. A local SMTP integration test verifies delivery and demo suppression. Real provider credentials and inbox delivery still need deployment testing.
 
 ## Local addresses
 
@@ -65,9 +65,15 @@ Brand text and API endpoint: frontend/.env.local
 
 `cd frontend` then `npm run build` builds the frontend. Run from the project root again for `npm start`.
 
-Each new school should use the same source release with its own backend database, environment configuration and domain. Deployment packaging supports sample and CHS profiles; hosting uploads remain manual. Use a separate folder for independent local school tests; stop one before starting another because they use the same ports.
+Sample and Cherry Hill share one backend/database, with separate frontend builds and school records. Deployment packaging supports sample and CHS profiles; upload the common backend once. Emails are globally unique in the users collection: one email currently belongs to one school. PocketBase superuser access, SMTP configuration, backups and downtime are shared. Additional schools require explicit provisioning and frontend configuration; ordinary school admins cannot create schools or enable email.
 
 PocketBase is pinned to 0.28.4 as a compatibility baseline for the export. The ZIP does not identify the original backend version. Validate migrations, authorization, backups and a supported PocketBase upgrade before production. Never use the demo credentials for real school records. No AWS resources or live DNS were changed.
+
+## New admin features
+
+- **Administrators**: create another school admin with a name, email and password of at least 12 characters. Parents cannot use the creation endpoint or promote their accounts.
+- **Lunch Labels**: choose an exact lunch date and generate student labels only. Print or use the browser's Save as PDF. Label stock is 1 × 2⅝ inch, 30 per Letter sheet. Menu and delivery time changes start separate rows; chicken wrap types are separate menu sections.
+- **Monday–Friday**: parent menus, selections, admin filters/overrides, summaries and CSV imports support five weekdays. The migration adds Tuesday, Thursday and Friday to existing menu availability; adjust each item in Menu if needed. Admins choose the allowed meal selection days in Settings (Thursday and Friday by default), using America/New_York. Select no days to close parent ordering. Each selected day allows orders for the following week's Monday–Friday, including next week when Monday itself is selected.
 
 ## Updating a downloaded copy
 
@@ -78,3 +84,5 @@ Stop the old app with Control+C and keep its folder as a backup. Download Code �
 After frontend dependencies are installed, run `npm test` from the project root for schedule, import and label regressions. In `frontend`, run `npx tsc --noEmit -p tsconfig.app.json` and `npm run build`. Print one plain-paper label sheet at 100% with browser headers and footers disabled before using label stock.
 
 - **Audit logs**: Admin Audit Logs retains the existing administrative history. Parent Audit Log is recorded automatically on the server for new parent meal selections and changes, with immutable snapshots of parent, student, meal and delivery time. Parent history begins when this update is installed; past changes cannot be reconstructed.
+
+School isolation integration checks: `npm run test:integration` (Python 3 and the PocketBase binary downloaded by `npm start`, or `POCKETBASE_BINARY`). Uses disposable local data and a local SMTP capture server, never live school data.

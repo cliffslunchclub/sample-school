@@ -1,75 +1,61 @@
-# SiteGround + PocketHost
+# SiteGround + one shared PocketHost backend
 
-One repository, two independent installations of the same interface. No banner or visual changes. Deploy the sample school first; Cherry Hill is a later deployment.
+Version 1.2.0 uses one PocketBase instance for both school sites. Keep the existing sample PocketHost instance at `https://clc-sample-school.pockethost.io`; its name does not affect school isolation.
 
-| Target | Frontend on SiteGround | Separate PocketHost backend | Fresh-install data |
-| --- | --- | --- | --- |
-| `sample` | `sampleschool.cliffslunchclub.com` | Sample instance URL | Demo admin, four families/11 students, sample menus/teachers and weekday orders |
-| `chs` | `chs.cliffslunchclub.com` | Different CHS instance URL | School record and schema only; no sample accounts or school data |
+| Frontend | Build target / school slug | Backend |
+| --- | --- | --- |
+| https://sampleschool.cliffslunchclub.com | sample | https://clc-sample-school.pockethost.io |
+| https://chs.cliffslunchclub.com | chs | Same instance |
 
-School settings, accounts, students, orders and backups remain separate. Hosting keys, passwords and databases never go into GitHub. Do not overwrite the current CHS installation or DNS until its data and schema have been reviewed and backed up.
+Backend rules scope all school records to the authenticated account. Write hooks check linked records, including admin imports. School slugs select login and registration; knowing another slug does not grant access. Ordinary school admins cannot change school identity or email policy. User emails are globally unique: one email currently belongs to one school. Backups, SMTP settings and backend downtime are shared.
 
-## First sample deployment
+## Prepare the upgrade
 
-1. Create a PocketHost account and one sample instance. Record its public HTTPS URL. This repo is tested with PocketBase **0.28.4**; PocketHost may offer a later 0.28 patch. Select the closest compatible version and verify the actual hosted version. If 0.28 is unavailable, test an upgrade before publishing. Create a private, strong PocketBase superuser credential; this is separate from the demo app admin.
-2. Add an Ed25519 SSH public key under PocketHost Account → Keys, restricted to the sample instance. Keep its private key on your Mac. Connect using an SFTP client: host `ftp.pockethost.io`, port `2222`, username your PocketHost email, SSH key authentication. There is no SSH shell, rsync or scp.
-3. In your Mac checkout, install dependencies with `cd frontend`, `npm ci`, then `cd ..`. Check out the intended GitHub release tag or commit before preparing packages. Run:
+Use the exact GitHub commit intended for deployment. PocketBase compatibility baseline remains **0.28.4**; verify the hosted version. Install frontend dependencies with `npm ci` inside frontend, then run from the repository root:
 
 ```bash
 npm test
+npm run test:integration
 npx --prefix frontend tsc --noEmit -p frontend/tsconfig.app.json
-npm run deploy:prepare -- --target sample --api-url https://YOUR-SAMPLE-INSTANCE.pockethost.io --release v1.1.0
+npm run deploy:prepare -- --target sample --api-url https://clc-sample-school.pockethost.io --release RELEASE
+npm run deploy:prepare -- --target chs --api-url https://clc-sample-school.pockethost.io --release RELEASE
 ```
 
-Replace the URL and release identifier with the actual instance URL and source tag/commit. The build overrides the Mac's local API endpoint. It creates `.deploy/sample/v1.1.0/` with:
+Replace RELEASE with the actual commit/tag. Integration tests require Python 3 and the local PocketBase binary (run npm start once to download, or set POCKETBASE_BINARY). They use disposable local databases and local SMTP only.
 
-- `siteground/`: static website, `.htaccess` for nested-route refreshes, and `release.json`.
-- `pockethost/pb_hooks/` and `pockethost/pb_migrations/`: backend source and all required helper modules.
-- `release.json`: target, API URL, frontend domain, source digest and release identifier.
+Each target produces a static `siteground/` folder and the **same common backend code** under `pockethost/`. Backend `/api/release` reports target `shared`; frontend `/release.json` reports its target/school_slug. All must agree on version and source_sha256. The shared fresh backend seeds sample data plus an empty Cherry Hill school/settings record; no Cherry Hill demo users or orders. Packaging never includes databases, passwords, private keys or environment files. Packages are immutable.
 
-No database, credentials, environment files, binaries or node_modules are packaged. Packages are immutable: a target/version directory cannot be overwritten. Use a new release identifier when code changes. This command prepares files only; no hosts or DNS are changed.
+## Upgrade the existing sample instance
 
-4. In SiteGround, create the sample subdomain with its own document root and SSL. Upload the **contents** of `siteground/`, including `.htaccess`, into that document root. Serve this React build as static files; a Node.js project is unnecessary. Keep other websites in their own document roots.
-5. Power off the sample instance in PocketHost before uploading the complete backend release. In SFTP open the correct sample instance directory, and upload the package's hooks and migrations into its `pb_hooks` and `pb_migrations` directories. Include helper `.js` files as well as `.pb.js`. Do not touch `pb_data`. Review starter hooks before removing any on a first install; on updates remove obsolete hooks required by the code change, while preserving migration history.
-6. Start/restart PocketHost and inspect logs for migration failures. Verify schema in its superuser dashboard. If uploaded migrations do not apply at startup, stop and resolve this with PocketHost; do not manually create collections with different IDs.
-7. Visit the backend `/api/release` and frontend `/release.json`. Both must show the same target, version and source digest. The frontend manifest must name the correct backend URL. These manifests contain no credentials.
-8. Test on the actual HTTPS website: parent/admin login, all four demo families and their 11 students, student management, saving/changing meals, ordering days, separate audit logs, CSV workflow, labels and refresh of a nested route such as `/admin/audit`. PocketBase's default CORS permits cross-origin requests; if customized, allow the correct frontend origin and verify OPTIONS/auth calls.
+1. Create and download a **full PocketBase backup** before uploading. CSV is a useful data export but does not preserve passwords, schema and complete application state.
+2. Plan a short maintenance window. The new auth rule requires a school header from the new frontend, so the old frontend cannot log in against the new backend.
+3. Turn the instance off. Using the existing scoped SFTP key, upload **all** common pb_hooks and pb_migrations from one target package into the existing matching directories. Keep `local_email.pb.js`: it now contains the shared school email policy. Do not touch pb_data. Include all helper .js files.
+4. Start the instance and check logs. The new forward migration preserves existing sample accounts, students, meals and settings, assigns the existing school slug `sample`, and adds an empty `chs` school with a private generated registration code and email disabled. The migration refuses ambiguous databases with more than one existing school; review manually rather than relabeling data.
+5. Upload the sample frontend contents into its SiteGround public_html, directly at the document root. Include .htaccess; avoid an extra enclosing folder. Check HTTPS, frontend/backend manifests, admin/parent login and nested-route refreshes.
+6. Before importing real data, test both school accounts against the hosted backend. A sample admin must see only sample records and a Cherry Hill admin only Cherry Hill records.
 
-Sample parent logins: `parent@example.test`, `parent2@example.test`, `parent3@example.test`, `parent4@example.test`. Admin: `admin@example.test`; password `LocalLunch2026!`; registration code `DEMO2026`. Mail stays suppressed on the sample. This is an editable demonstration; anyone given admin access can change its records. Share admin access separately and use invented records only. Sample seed orders cover every Monday–Friday in the configured semester at installation. Existing orders are preserved; seed records are not parent audit events. Adjust semester dates and ordering days in Settings before a demo because seed dates are fixed; changing dates later does not automatically reseed orders. Never copy CHS records into the sample.
+PocketHost SFTP: ftp.pockethost.io, port 2222, account email username, existing SSH key. No shell access is required. Never copy the sample database onto an old Cherry Hill installation.
 
-## Cherry Hill later
+## Provision Cherry Hill
 
-Create its own PocketHost instance and prepare from the exact code version that passed on the sample:
+In the PocketBase superuser dashboard:
 
-```bash
-npm run deploy:prepare -- --target chs --api-url https://YOUR-CHS-INSTANCE.pockethost.io --release v1.1.0
-```
+1. Locate the school with slug `chs`. Its name is Cherry Hill Elementary, active=true, frontend_origin=`https://chs.cliffslunchclub.com`, email_enabled=false. Do not change the existing sample school identity.
+2. Create the first real app admin in users: role=admin, active=true, verified=true, school=that CHS school, real name/email and a private strong password. This is separate from the PocketBase superuser account. Do not use demo credentials.
+3. Log into the CHS frontend to set its registration code, semester dates and ordering days; populate/import grades, teachers, delivery times/rules, menus, students and orders. Existing Coderick CSV exports need review/mapping; they are not a complete database migration. Parent passwords will not be restored from CSV.
+4. Recreate the CHS SiteGround subdomain/document root and upload the CHS frontend contents there. Enable HTTPS. Keep the old Coderick site until exports are reviewed and the replacement is tested; switch DNS only when ready.
 
-Sample-data guards are baked into the generated migrations: CHS gets no demo accounts even if a host environment variable is missing. Source migrations default to demo mode for `npm start`; `CLIFFS_SEED_DEMO=false npm start` creates a clean local template instead. Changing profiles does not remove data from existing databases because applied migrations do not rerun.
+## Enable outgoing Cherry Hill email
 
-For a **new empty CHS database**, use its private superuser dashboard to set the school name, create the first application user (`role=admin`, `active=true`, `verified=true`, matching school, real email/name and private password), and create a school settings record with private registration code, semester dates and ordering days. Populate grades, teachers, delivery slots/rules and menus through the app before inviting parents.
+1. Configure SMTP in PocketBase Settings with the chosen mailbox/provider's host, port, encryption, username/password and verified sender. Enter secrets only in the provider dashboard, never GitHub. Set PocketBase's global application URL to the CHS frontend for other standard email templates.
+2. Confirm the CHS school frontend_origin above, then set **only CHS email_enabled=true** as a PocketBase superuser. Sample user emails stay blocked even if their flag is changed.
+3. Request a password reset for a real CHS test account from the CHS frontend. Check inbox/spam and the actual reset link: it must open `https://chs.cliffslunchclub.com/reset-password?token=...`. Finish reset and log in with the new password. PocketBase throttles repeated reset requests; use a fresh test account or wait before retrying.
+4. Verify sample reset requests send no email, and that a reset request from the wrong school site has the same generic response without sending mail. Built-in verification/email-change/OTP/auth-alert user messages also obey the school email policy. No new meal-confirmation or scheduled notification feature is added.
 
-The CHS package omits the local email-suppression hook. Configure and test SMTP/password reset before launch; if an older installation has `pb_hooks/local_email.pb.js`, remove it explicitly while the backend is off.
+Actual SMTP credentials and inbox delivery must be tested before inviting parents. Mail support in code does not configure a provider account.
 
-For **existing CHS data**, migration is a separate task. Validate the existing PocketBase version and schema, test on a backup, and review historical data-changing migrations (including menu availability and semester dates). Do not upload a sample/fresh database, overwrite `pb_data`, run rollback commands or assume the existing export matches this schema. This preparation does not migrate or replace the current CHS website.
+## Updates and recovery
 
-## Releasing updates to both sites
+Build both frontends from the same fixed commit, with the same backend URL and different target slugs. Test the backend locally first; a shared backend update affects both schools immediately. Back up the whole database, use maintenance for incompatible updates, upload the common backend once, then upload both frontends. Verify manifests and both school workflows. Hosting uploads remain manual; no automatic GitHub deployment is configured.
 
-1. Commit code to GitHub and use a fixed tag/commit for the release. Future schema changes use new forward migrations. The initial seed guards only affect fresh installs; existing records stay attached to their IDs.
-2. Prepare and upload that release to the sample backend first, then frontend. Retain the previous packages and any sample backup you need. Verify manifests and actual hosted workflows.
-3. From the same unchanged checkout prepare CHS with its own API URL. Compare the two `source_sha256` values: they must match. A mismatch requires retesting or restoring the correct source checkout.
-4. Before CHS updates, create and download a PocketBase database backup and retain the last code packages. Apply compatible backend migrations first, then frontend. Schedule maintenance if the new backend cannot support the old frontend during that interval.
-5. Check the CHS manifests, parent/admin login, orders and audit history. Upload success is not sufficient verification.
-
-Each site retains its own settings and data. Migrations may intentionally change data; review the release notes before promotion. Initially releases are manual. A future GitHub Actions workflow can automate sample releases and provide an explicit CHS promotion using a protected environment. No automatic live deployment or hosting secrets are configured yet.
-
-Frontend rollback is reuploading the prior package **only if it works with the current backend schema**. For incompatible backend changes prefer a forward fix; otherwise restore a tested backup with matching backend/frontend during maintenance. Backup restoration loses changes made since that backup. Do not assume reversing migrations is safe.
-
-## Provider references
-
-- https://www.siteground.com/kb/what-is-node-js-project
-- https://pockethost.io/docs/ftp
-- https://pockethost.io/docs/versions
-- https://pockethost.io/docs/backup-restore
-
-Verify actual hosted version, migration startup, DNS/SSL, browser workflows and physical label printing during deployment. Local checks do not replace these checks.
+Rollback only with compatible code/schema; for this isolation upgrade restore a full tested backup with its matching old hooks/frontends if necessary. Restoring a shared backup restores both schools and loses writes since that backup. Do not reverse the isolation migration or rerun historical migrations. Never deploy the sample seed scripts into the old Coderick database.

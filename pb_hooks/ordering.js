@@ -1,6 +1,7 @@
 // Shared by create/update hooks; audits are committed in the same transaction as the meal.
 module.exports = {
   process: (e, action) => {
+    require(__hooks + "/school-isolation.js").validate(e)
     if (!e.auth || e.auth.getString("role") !== "parent") return e.next()
     if (!e.auth.getBool("active")) throw new ForbiddenError("Your account is inactive.")
     const app=e.app

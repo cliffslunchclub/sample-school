@@ -19,7 +19,9 @@ routerAdd("POST", "/api/register-parent", (e) => {
   // Validate the school verification code
   let settings
   try {
-    settings = $app.findFirstRecordByFilter("settings", "id != ''")
+    const slug = String(info.headers["x_school_slug"] || "")
+    const school = $app.findFirstRecordByFilter("schools", "slug = {:slug} && active = true", {slug:slug})
+    settings = $app.findFirstRecordByFilter("settings", "school = {:school}", {school:school.id})
   } catch (err) {
     return e.json(500, { message: "Registration is not available yet. Please contact the school." })
   }

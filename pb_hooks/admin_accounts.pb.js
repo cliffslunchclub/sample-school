@@ -3,6 +3,7 @@ routerAdd("POST", "/api/admin/accounts", (e) => {
   if (!e.auth || e.auth.getString("role") !== "admin" || !e.auth.getBool("active")) {
     return e.json(403, {message: "An active administrator account is required."})
   }
+  if (!$app.findRecordById("schools", e.auth.getString("school")).getBool("active")) return e.json(403, {message:"School access denied."})
   const body = e.requestInfo().body || {}
   const firstName = String(body.first_name || "").trim()
   const lastName = String(body.last_name || "").trim()
@@ -40,6 +41,7 @@ routerAdd("GET", "/api/school-calendar", (e) => {
   if (!e.auth || !e.auth.getBool("active")) return e.json(403, {message:"Please sign in."})
   const school = e.auth.getString("school")
   try {
+    if (!$app.findRecordById("schools",school).getBool("active")) return e.json(403,{message:"School access denied."})
     const settings = $app.findFirstRecordByFilter("settings", "school = {:school}", {school:school})
     return e.json(200, {id:settings.id, semester_start:settings.getString("semester_start"), semester_end:settings.getString("semester_end"), ordering_days:settings.getStringSlice("ordering_days")})
   } catch (err) {return e.json(404, {message:"School calendar not found."})}

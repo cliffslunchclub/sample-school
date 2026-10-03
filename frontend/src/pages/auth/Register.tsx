@@ -27,7 +27,7 @@ export default function Register() {
     try {
       const res = await fetch(`${pb.baseURL}/api/register-parent`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-School-Slug": import.meta.env.VITE_SCHOOL_SLUG || "sample" },
         body: JSON.stringify(form),
       });
       const data = await res.json();

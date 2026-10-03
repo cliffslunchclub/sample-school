@@ -1,7 +1,7 @@
 routerAdd("POST", "/api/import/parse-csv", (e) => {
   // ---- Admin-only guard (server-side) ----
   const auth = e.auth;
-  if (!auth || auth.getString("role") !== "admin") {
+  if (!auth || !auth.getBool("active") || auth.getString("role") !== "admin" || !auth.getString("school") || !$app.findRecordById("schools",auth.getString("school")).getBool("active")) {
     return e.json(403, { message: "Only administrators may import data." });
   }
 

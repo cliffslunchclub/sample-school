@@ -42,3 +42,11 @@ Version 1.1.0 verified:
 - Existing meal records are retained unchanged. Repeated startup does not duplicate students/orders or rerandomize saved menus. Fresh CHS receives no demo users/students/orders.
 - Parent/Admin guides now use the current domain and school ordering settings, carry version 1.1.0/update date, and cover five-day meals, current account controls, admin creation, separate audit history and student-only labels.
 - Regression tests, TypeScript check and frontend/sample/CHS builds pass. Browser print layout remains a deployment check.
+
+## Version 1.2.0 shared backend (supersedes separate-instance deployment notes above)
+
+- Forward upgrade tested on a database seeded with the prior migrations. Existing users, students, meals, menus and audit rows remain byte-for-byte equivalent; existing settings are preserved, with one new CHS settings record.
+- Real PocketBase API tests verify school-specific login/registration, wrong-school login rejection, both-direction list/view/update/delete isolation across 12 collections, forbidden cross-school creates/relationships, parent school/role reassignment rejection, admin account creation and calendar scoping.
+- Parent meal writes and immutable audit creation remain transactional; no-op edits do not create audit rows. Invalid cross-school meal writes create no audit records.
+- Local SMTP integration verifies email disabled by default, enabled CHS password reset delivery with CHS frontend link, and suppression of sample user mail. No real email sent by tests.
+- Real PocketHost upgrade, DNS, CSV migration, provider SMTP credentials and inbox delivery are still deployment work. No live database or domain was changed by this implementation.
