@@ -46,8 +46,11 @@ const extraKeys={tuesday:'2026-10-06',thursday:'2026-10-08',friday:'2026-10-09'}
 const analysis=analyzeCombined([['Demo Student','3','Teacher',names[0],names[1],names[0]]],mapping,ref,key,'2026-10-07',extraKeys);
 assert.equal(analysis.stats.tuesdayOrders,1);assert.equal(analysis.stats.thursdayOrders,1);assert.equal(analysis.stats.fridayOrders,1);assert.equal(analysis.rows[0].status,'matched');
 const invalid=analyzeCombined([['Demo Student','3','Teacher',names[0]]],mapping,ref,key,'2026-10-07',{});assert.equal(invalid.rows[0].status,'error');
-const writes=[];let batchCalls=0;const batchSizes=[];globalThis.__importMock={send:async(path,{body})=>{assert.equal(path,'/api/batch');batchCalls++;batchSizes.push(body.requests.length);return body.requests.map((request)=>{writes.push(request);return {status:200,body:{...request.body,id:'created'+writes.length}};});}};
-const executeCode=transpile('../frontend/src/lib/importExecute.ts').replace('import pb from "./pocketbase";','const pb = globalThis.__importMock;').replace('"./csv"',JSON.stringify(csvUri));
+const writes=[];let batchCalls=0;const batchSizes=[];let failNextBatch=false;globalThis.__importMock={send:async(path,{body})=>{assert.equal(path,'/api/batch');batchCalls++;batchSizes.push(body.requests.length);if(failNextBatch){failNextBatch=false;throw Object.assign(new Error('rate limited'),{status:429});}return body.requests.map((request)=>{writes.push(request);return {status:200,body:{...(request.body||{}),id:'created'+writes.length}};});}};
+const batchCode=transpile('../frontend/src/lib/pocketbaseBatch.ts').replace('import pb from "./pocketbase";','const pb = globalThis.__importMock;');
+const {sendBatchRequests,BatchWriteError}=await import(uri(batchCode));
+globalThis.sendBatchRequests=sendBatchRequests;globalThis.BatchWriteError=BatchWriteError;
+const executeCode=transpile('../frontend/src/lib/importExecute.ts').replace('import pb from "./pocketbase";','').replace('import { sendBatchRequests, BatchWriteError } from "./pocketbaseBatch";','const {sendBatchRequests, BatchWriteError} = globalThis;').replace('export { BatchWriteError as ImportExecutionError } from "./pocketbaseBatch";','').replace('"./csv"',JSON.stringify(csvUri));
 const {executeCombined}=await import(uri(executeCode));
 const executed=await executeCombined(analysis.rows,ref,key,'2026-10-07',{schoolId:'school'},extraKeys);
 assert.equal(executed.createdMeals,3);assert.deepEqual(writes.map(p=>p.body.lunch_date.slice(0,10)),Object.values(extraKeys));assert.equal(batchCalls,1);assert.ok(writes.every(p=>p.url==='/api/collections/meal_selections/records'));
@@ -61,4 +64,7 @@ const bulkAnalysis=analyzeCombined(bulkRows,{student_name:0,grade:1,teacher:2,de
 writes.length=0;batchCalls=0;batchSizes.length=0;
 const bulkResult=await executeCombined(bulkAnalysis.rows,emptyRef,key,'2026-10-07',{schoolId:'school'});
 assert.equal(bulkResult.createdStudents,41);assert.equal(bulkResult.createdMeals,41);assert.equal(batchCalls,8);assert.deepEqual(batchSizes,[1,1,1,1,40,1,40,1]);
-console.log('PASS: five-day CSV analysis; transactional batched writes and updates; 40-record chunking; missing semester dates; conflict keep/replace behavior');
+const purgeProgress={count:0,records:0};writes.length=0;batchCalls=0;batchSizes.length=0;failNextBatch=true;
+await sendBatchRequests(Array.from({length:85},(_,i)=>({method:'DELETE',url:`/api/collections/meal_selections/records/${i}`})),'Meal selections',purgeProgress);
+assert.equal(purgeProgress.count,3);assert.equal(purgeProgress.records,85);assert.equal(batchCalls,4);assert.deepEqual(batchSizes,[40,40,40,5]);
+console.log('PASS: five-day CSV analysis; transactional batched writes, updates, and deletes; 40-record chunking; 429 retry; missing semester dates; conflict keep/replace behavior');
