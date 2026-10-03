@@ -67,6 +67,12 @@ with tempfile.TemporaryDirectory(prefix='clc-isolation-') as tmp:
    {'method':'POST','url':'/api/collections/students/records','body':{'name':'Cross School','school':sample,'grade':g['id'],'teacher':t['id'],'active':True}},
   ]},ct,'chs')
   assert not any(student['name']=='Must Roll Back' for student in rows('students',ct,'chs')),'failed batch should roll back earlier operations'
+  deleted=ok('/api/batch',{'requests':[
+   {'method':'DELETE','url':'/api/collections/students/records/'+batch[0]['body']['id']},
+   {'method':'DELETE','url':'/api/collections/students/records/'+batch[1]['body']['id']},
+  ]},ct,'chs')
+  assert len(deleted)==2 and all(item['status']==204 for item in deleted)
+  assert not any(student['name'] in ('Batch Student One','Batch Student Two') for student in rows('students',ct,'chs')),'batch deletes should remove selected records'
   st=create('students',{'name':'CHS Student','grade':g['id'],'teacher':t['id'],'parent':cp['record']['id'],'school':chs,'active':True},cpt,'chs')
   all_days=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
   for tok,slug in [(sa,'sample'),(ct,'chs')]:
