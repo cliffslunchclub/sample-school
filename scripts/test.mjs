@@ -38,6 +38,7 @@ console.log('PASS: five-day calendar and timezone boundaries; label row/page bou
 
 // Import regression: each added day matches, resolves conflicts, and writes the correct date.
 const csvUri=uri(transpile('../frontend/src/lib/csv.ts'));
+const {toCsv}=await import(csvUri);
 const analyzeCode=transpile('../frontend/src/lib/importAnalyze.ts').replace('import pb from "./pocketbase";','const pb = {};').replace('"./csv"',JSON.stringify(csvUri));
 const {analyzeCombined}=await import(uri(analyzeCode));
 const ref={grades:[{id:'grade',name:'Grade 3',sort_order:1}],teachers:[{id:'teacher',name:'Teacher',grade:'grade'}],students:[{id:'student',name:'Demo Student',grade:'grade',teacher:'teacher',parent:'parent'}],menu,times:[],rules:[],selections:[]};
@@ -64,7 +65,17 @@ const bulkAnalysis=analyzeCombined(bulkRows,{student_name:0,grade:1,teacher:2,de
 writes.length=0;batchCalls=0;batchSizes.length=0;
 const bulkResult=await executeCombined(bulkAnalysis.rows,emptyRef,key,'2026-10-07',{schoolId:'school'});
 assert.equal(bulkResult.createdStudents,41);assert.equal(bulkResult.createdMeals,41);assert.equal(batchCalls,8);assert.deepEqual(batchSizes,[1,1,1,1,40,1,40,1]);
+const menuImportCode=transpile('../frontend/src/lib/menuImport.ts').replace('"./csv"',JSON.stringify(csvUri)).replace('"./semester"',JSON.stringify(scheduleUri)).replace('import { sendBatchRequests } from "./pocketbaseBatch";','const {sendBatchRequests} = globalThis;');
+const {MENU_CSV_HEADERS,parseCsvText,analyzeMenuCsv,executeMenuImport}=await import(uri(menuImportCode));
+const menuCsv=toCsv([MENU_CSV_HEADERS,['Soup, Tomato','Soup, "classic"', 'Yes','No','Yes','No','No','Yes'],['Existing Meal','unchanged','Yes','No','Yes','No','No','Yes'],['Updated Meal','new detail','No','No','No','No','Yes','Yes']]);
+const menuMatrix=parseCsvText('\uFEFF'+menuCsv);assert.equal(menuMatrix[1][0],'Soup, Tomato');assert.equal(menuMatrix[1][1],'Soup, "classic"');
+const currentMenu=[{id:'same',name:'Existing Meal',description:'unchanged',active:true,days:['Monday','Wednesday']},{id:'update',name:'Updated Meal',description:'old detail',active:true,days:['Monday']}];
+const menuRows=analyzeMenuCsv(menuMatrix,currentMenu);assert.deepEqual(menuRows.map(r=>r.status),['new','same','conflict']);menuRows[2].resolution='update';
+writes.length=0;batchCalls=0;batchSizes.length=0;const menuProgress={count:0,records:0};
+const menuImportResult=await executeMenuImport(menuRows,'school',menuProgress);
+assert.deepEqual(menuImportResult,{added:1,updated:1,unchanged:1});assert.equal(writes.length,2);assert.deepEqual(writes.map(r=>r.method),['POST','PATCH']);assert.equal(writes[0].body.school,'school');assert.match(writes[1].url,/menu_items\/records\/update$/);
+const menuBad=analyzeMenuCsv(parseCsvText(toCsv([MENU_CSV_HEADERS,['Bad Meal','','maybe','No','No','No','No','Yes']])),[]);assert.equal(menuBad[0].status,'error');
 const purgeProgress={count:0,records:0};writes.length=0;batchCalls=0;batchSizes.length=0;failNextBatch=true;
 await sendBatchRequests(Array.from({length:85},(_,i)=>({method:'DELETE',url:`/api/collections/meal_selections/records/${i}`})),'Meal selections',purgeProgress);
 assert.equal(purgeProgress.count,3);assert.equal(purgeProgress.records,85);assert.equal(batchCalls,4);assert.deepEqual(batchSizes,[40,40,40,5]);
-console.log('PASS: five-day CSV analysis; transactional batched writes, updates, and deletes; 40-record chunking; 429 retry; missing semester dates; conflict keep/replace behavior');
+console.log('PASS: five-day order CSV; menu CSV template parsing, safe matching, explicit update; transactional batch writes/deletes; 40-record chunking; 429 retry; conflict keep/replace behavior');
