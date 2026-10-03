@@ -55,6 +55,12 @@ with tempfile.TemporaryDirectory(prefix='clc-isolation-') as tmp:
   g=create('grades',{'name':'CHS Grade','school':chs,'active':True},ct,'chs')
   t=create('teachers',{'name':'CHS Teacher','grade':g['id'],'school':chs,'active':True},ct,'chs')
   m=create('menu_items',{'name':'CHS Meal','school':chs,'active':True,'days':['Monday','Tuesday','Wednesday','Thursday','Friday']},ct,'chs')
+  menu_batch=ok('/api/batch',{'requests':[
+   {'method':'POST','url':'/api/collections/menu_items/records','body':{'name':'CSV Menu Item','description':'Imported in a batch','school':chs,'active':True,'days':['Monday','Wednesday']}},
+   {'method':'PATCH','url':'/api/collections/menu_items/records/'+m['id'],'body':{'description':'Updated through menu CSV'}},
+  ]},ct,'chs')
+  assert len(menu_batch)==2 and all(item['status']==200 for item in menu_batch)
+  assert menu_batch[0]['body']['school']==chs and menu_batch[1]['body']['description']=='Updated through menu CSV'
   d=create('delivery_time_slots',{'label':'12:00','school':chs,'active':True},ct,'chs')
   rule=create('delivery_rules',{'grade':g['id'],'teacher':t['id'],'delivery_time':d['id'],'school':chs},ct,'chs')
   batch=ok('/api/batch',{'requests':[
