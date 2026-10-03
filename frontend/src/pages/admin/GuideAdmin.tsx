@@ -101,7 +101,15 @@ export default function GuideAdmin() {
             "Enter the meal name, a short description, and which days it's served (any combination of Monday through Friday).",
             'Toggle a meal "Inactive" to hide it from parents without deleting it.',
           ]} />
-          <Note>Menu item names must match exactly when importing from CSV. Use the "Available menu items" panel on the Import page as a reference.</Note>
+          <p className="mb-3 text-sm text-ink-soft">To add or update several menu items at once:</p>
+          <Steps steps={[
+            'Choose "Download template" on the Menu page and fill in one row per item.',
+            'Use Yes or No for each weekday. Active can be Yes or No; a blank Active cell defaults to Yes.',
+            'Choose "Upload menu CSV" and review the preview. This menu upload is separate from student and order imports.',
+            'New items are added. Existing name matches stay unchanged unless you choose "Update existing". Items omitted from the file are never changed or deleted.',
+            'Click "Confirm menu upload" to save the reviewed changes.',
+          ]} />
+          <Note>Menu item names used by order imports should match the menu. Updating a menu item preserves its existing orders.</Note>
         </Section>
 
         {/* Section 7 */}
