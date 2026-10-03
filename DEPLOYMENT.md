@@ -1,6 +1,6 @@
 # SiteGround + one shared PocketHost backend
 
-Version 1.2.1 uses one PocketBase instance for both school sites. Keep the existing shared PocketHost instance at `https://clc-schools.pockethost.io`.
+Version 1.2.2 uses one PocketBase instance for both school sites. Keep the existing shared PocketHost instance at `https://clc-schools.pockethost.io`.
 
 | Frontend | Build target / school slug | Backend |
 | --- | --- | --- |
@@ -63,6 +63,8 @@ The combined CSV importer and Settings purge send PocketBase transactional batch
 3. Set **Max requests** to at least `40`. Keep the configured body-size and processing-time limits as low as the host allows; each request contains ordinary school records, not files.
 
 Each batch is transactional. If a batch fails, that batch rolls back. Imports and purges use several batches for record dependencies, so earlier completed batches can remain saved. The import screen reports this and advises refreshing before retrying. Purge reports how many records were deleted in completed batches; refresh counts and inspect the selected records before trying again.
+
+Menu CSV uploads are separate from roster/order imports. The Menu page downloads the menu template, previews additions and existing-item matches, and requires confirmation. Existing matches default to Keep Existing; updating a match is an explicit choice. Rows omitted from the file are left alone. Menu uploads use the same PocketBase Batch API setting.
 
 ## Updates and recovery
 
