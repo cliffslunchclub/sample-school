@@ -1,10 +1,10 @@
 # SiteGround + one shared PocketHost backend
 
-Version 1.2.0 uses one PocketBase instance for both school sites. Keep the existing sample PocketHost instance at `https://clc-sample-school.pockethost.io`; its name does not affect school isolation.
+Version 1.2.1 uses one PocketBase instance for both school sites. Keep the existing shared PocketHost instance at `https://clc-schools.pockethost.io`.
 
 | Frontend | Build target / school slug | Backend |
 | --- | --- | --- |
-| https://sampleschool.cliffslunchclub.com | sample | https://clc-sample-school.pockethost.io |
+| https://sampleschool.cliffslunchclub.com | sample | https://clc-schools.pockethost.io |
 | https://chs.cliffslunchclub.com | chs | Same instance |
 
 Backend rules scope all school records to the authenticated account. Write hooks check linked records, including admin imports. School slugs select login and registration; knowing another slug does not grant access. Ordinary school admins cannot change school identity or email policy. User emails are globally unique: one email currently belongs to one school. Backups, SMTP settings and backend downtime are shared.
@@ -53,6 +53,16 @@ In the PocketBase superuser dashboard:
 4. Verify sample reset requests send no email, and that a reset request from the wrong school site has the same generic response without sending mail. Built-in verification/email-change/OTP/auth-alert user messages also obey the school email policy. No new meal-confirmation or scheduled notification feature is added.
 
 Actual SMTP credentials and inbox delivery must be tested before inviting parents. Mail support in code does not configure a provider account.
+
+## Enable larger CSV imports
+
+The combined CSV importer sends PocketBase transactional batches of up to 40 record writes. Enable the Batch API once on the shared PocketBase instance before importing a large roster:
+
+1. Sign in to the PocketBase superuser dashboard.
+2. Open **Settings → Application → Batch API** and enable it.
+3. Set **Max requests** to at least `40`. Keep the configured body-size and processing-time limits as low as the host allows; each request contains ordinary school records, not files.
+
+Each batch is transactional. If a batch fails, that batch rolls back. The full import uses several batches for record dependencies, so batches completed earlier can remain saved. The import screen reports this and advises refreshing before retrying. Re-importing after a partial attempt will analyze the saved records and let the admin keep or replace existing meals.
 
 ## Updates and recovery
 
