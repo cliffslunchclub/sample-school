@@ -1,7 +1,7 @@
 import pb from "./pocketbase";
 import { norm, gradeToken, gradeDisplayName, cleanName } from "./csv";
 import type { AnalyzedRow, RefData } from "./importAnalyze";
-import type { Grade, Teacher, DeliveryTime, Student, MenuItem, MealSelection } from "./types";
+import type { Grade, Teacher, DeliveryTime, Student, MealSelection } from "./types";
 
 export interface ExecResult {
   imported: number;
@@ -13,111 +13,74 @@ export interface ExecResult {
 }
 
 interface Ctx { schoolId?: string }
+type BatchRequest = { method: "POST" | "PATCH"; url: string; body: Record<string, unknown> };
+type BatchResponse<T> = { status: number; body: T };
 
-function makeEnsurers(ref: RefData, ctx: Ctx) {
-  const gradeByToken = new Map<string, Grade>();
-  ref.grades.forEach((g) => gradeByToken.set(gradeToken(g.name), g));
-  const teacherByKey = new Map<string, Teacher>();
-  ref.teachers.forEach((t) => teacherByKey.set(`${t.grade}|${norm(t.name)}`, t));
-  const timeByNorm = new Map<string, DeliveryTime>();
-  ref.times.forEach((t) => timeByNorm.set(norm(t.label), t));
-  const menuByNorm = new Map<string, MenuItem>();
-  ref.menu.forEach((mi) => menuByNorm.set(norm(mi.name), mi));
-  const gradeById = new Map(ref.grades.map((g) => [g.id, g]));
-  const teacherById = new Map(ref.teachers.map((t) => [t.id, t]));
-  const studentByKey = new Map<string, Student>();
-  ref.students.forEach((s) => {
-    const g = gradeById.get(s.grade);
-    const t = teacherById.get(s.teacher);
-    studentByKey.set(`${norm(s.name)}|${gradeToken(g?.name || "")}|${norm(t?.name || "")}`, s);
-  });
-  const selByKey = new Map<string, MealSelection>();
-  ref.selections.forEach((s) => {
-    const dk = s.lunch_date ? s.lunch_date.slice(0, 10) : "";
-    if (dk) selByKey.set(`${s.student}|${dk}`, s);
-  });
-  const ruleByTeacher = new Map<string, string>();
-  const ruleByGradeOnly = new Map<string, string>();
-  ref.rules.forEach((r) => {
-    if (r.teacher) ruleByTeacher.set(r.teacher, r.delivery_time);
-    else ruleByGradeOnly.set(r.grade, r.delivery_time);
-  });
-  let gradeOrder = Math.max(0, ...ref.grades.map((g) => g.sort_order || 0));
-  let timeOrder  = Math.max(0, ...ref.times.map((t) => t.sort_order  || 0));
+// Keep below PocketBase's usual batch request limit, while avoiding hundreds of
+// individual HTTP writes for larger school imports.
+const BATCH_SIZE = 40;
+const BATCH_INTERVAL_MS = 400;
+let lastBatchRequestAt = 0;
 
-  const ensureGrade = async (raw: string): Promise<Grade> => {
-    const tok = gradeToken(raw);
-    const hit = gradeByToken.get(tok);
-    if (hit) return hit;
-    const rec = await pb.collection("grades").create<Grade>({
-      name: gradeDisplayName(raw), sort_order: ++gradeOrder, active: true, school: ctx.schoolId,
-    });
-    gradeByToken.set(tok, rec);
-    return rec;
-  };
-
-  const ensureTeacher = async (gradeId: string, raw: string): Promise<Teacher> => {
-    const key = `${gradeId}|${norm(raw)}`;
-    const hit = teacherByKey.get(key);
-    if (hit) return hit;
-    const rec = await pb.collection("teachers").create<Teacher>({
-      name: cleanName(raw), grade: gradeId, active: true, school: ctx.schoolId,
-    });
-    teacherByKey.set(key, rec);
-    return rec;
-  };
-
-  const ensureTime = async (raw: string): Promise<DeliveryTime | null> => {
-    if (!raw.trim()) return null;
-    const hit = timeByNorm.get(norm(raw));
-    if (hit) return hit;
-    const rec = await pb.collection("delivery_time_slots").create<DeliveryTime>({
-      label: cleanName(raw), sort_order: ++timeOrder, active: true, school: ctx.schoolId,
-    });
-    timeByNorm.set(norm(raw), rec);
-    return rec;
-  };
-
-  const ensureRuleForTeacher = async (gradeId: string, teacherId: string, timeId: string) => {
-    if (ruleByTeacher.has(teacherId)) return;
-    await pb.collection("delivery_rules").create({
-      grade: gradeId, teacher: teacherId, delivery_time: timeId, school: ctx.schoolId,
-    });
-    ruleByTeacher.set(teacherId, timeId);
-  };
-
-  const ensureStudent = async (
-    name: string, gradeId: string, teacherId: string, gradeRaw: string, teacherRaw: string,
-  ) => {
-    const key = `${norm(name)}|${gradeToken(gradeRaw)}|${norm(teacherRaw)}`;
-    const hit = studentByKey.get(key);
-    if (hit) return { student: hit, created: false };
-    const rec = await pb.collection("students").create<Student>({
-      name: cleanName(name), grade: gradeId, teacher: teacherId, active: true, school: ctx.schoolId,
-    });
-    studentByKey.set(key, rec);
-    return { student: rec, created: true };
-  };
-
-  const lunchIsoFor = (dateKey: string): string =>
-    `${dateKey}T12:00:00.000Z`;
-
-  const deliveryTimeId = async (gradeId: string, teacherId: string, deliveryRaw: string) => {
-    if (deliveryRaw.trim()) {
-      const t = await ensureTime(deliveryRaw);
-      return t?.id ?? null;
-    }
-    return ruleByTeacher.get(teacherId) ?? ruleByGradeOnly.get(gradeId) ?? null;
-  };
-
-  return {
-    menuByNorm, selByKey,
-    ensureGrade, ensureTeacher, ensureTime, ensureRuleForTeacher,
-    ensureStudent, lunchIsoFor, deliveryTimeId,
-  };
+export class ImportExecutionError extends Error {
+  constructor(message: string, readonly stage: string, readonly batchesCommitted: number) {
+    super(message);
+    this.name = "ImportExecutionError";
+  }
 }
 
-/** Execute a combined import (roster + orders in one pass). */
+async function sendInBatches<T>(
+  _collection: string,
+  requests: BatchRequest[],
+  stage: string,
+  committed: { count: number },
+): Promise<T[]> {
+  const created: T[] = [];
+  for (let offset = 0; offset < requests.length; offset += BATCH_SIZE) {
+    const batchRequests = requests.slice(offset, offset + BATCH_SIZE);
+    try {
+      let response: BatchResponse<T>[] | undefined;
+      for (let attempt = 0; attempt < 4; attempt++) {
+        try {
+          const wait = BATCH_INTERVAL_MS - (Date.now() - lastBatchRequestAt);
+          if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+          lastBatchRequestAt = Date.now();
+          // PocketBase processes each /api/batch request in one transaction. If one
+          // subrequest fails, none of the writes in that chunk are committed.
+          response = await pb.send<BatchResponse<T>[]>("/api/batch", {
+            method: "POST",
+            body: { requests: batchRequests },
+            requestKey: null,
+          });
+          break;
+        } catch (error) {
+          const candidate = error as { status?: number; response?: { status?: number } };
+          const status = candidate.status || candidate.response?.status;
+          if (status !== 429 || attempt === 3) throw error;
+          await new Promise((resolve) => setTimeout(resolve, 500 * (2 ** attempt)));
+        }
+      }
+      if (!Array.isArray(response) || response.length !== batchRequests.length || response.some((item) => item.status < 200 || item.status >= 300)) {
+        throw new Error("PocketBase returned an incomplete batch response.");
+      }
+      created.push(...response.map((item) => item.body));
+      committed.count++;
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "Unknown PocketBase error.";
+      throw new ImportExecutionError(`${stage} could not be saved. ${detail}`, stage, committed.count);
+    }
+  }
+  return created;
+}
+
+type PreparedRow = {
+  row: AnalyzedRow;
+  gradeToken: string;
+  teacherNorm: string;
+  studentKey: string;
+};
+
+/** Execute a combined import (roster + orders in one pass) using transactional chunks. */
 export async function executeCombined(
   rows: AnalyzedRow[],
   ref: RefData,
@@ -126,167 +89,203 @@ export async function executeCombined(
   ctx: Ctx,
   extraKeys: Partial<Record<"tuesday" | "thursday" | "friday", string>> = {},
 ): Promise<ExecResult> {
-  const tuesdayKey = extraKeys.tuesday || "";
-  const thursdayKey = extraKeys.thursday || "";
-  const fridayKey = extraKeys.friday || "";
-  const e = makeEnsurers(ref, ctx);
+  const dateByDay: Record<string, string> = {
+    monday: mondayKey,
+    tuesday: extraKeys.tuesday || "",
+    wednesday: wednesdayKey,
+    thursday: extraKeys.thursday || "",
+    friday: extraKeys.friday || "",
+  };
   const res: ExecResult = { imported: 0, skipped: 0, errors: 0, createdStudents: 0, createdMeals: 0, replacedMeals: 0 };
+  const committed = { count: 0 };
+  const validRows: PreparedRow[] = [];
+  const gradeByToken = new Map<string, Grade>();
+  ref.grades.forEach((grade) => gradeByToken.set(gradeToken(grade.name), grade));
+
+  const teacherByKey = new Map<string, Teacher>();
+  ref.teachers.forEach((teacher) => teacherByKey.set(`${teacher.grade}|${norm(teacher.name)}`, teacher));
+  const timeByNorm = new Map<string, DeliveryTime>();
+  ref.times.forEach((time) => timeByNorm.set(norm(time.label), time));
+  const menuById = new Map(ref.menu.map((menu) => [menu.id, menu]));
+  const menuByNorm = new Map(ref.menu.map((menu) => [norm(menu.name), menu]));
+
+  const gradeIdByToken = new Map<string, string>();
+  ref.grades.forEach((grade) => gradeIdByToken.set(gradeToken(grade.name), grade.id));
+  const teacherIdByKey = new Map<string, string>();
+  ref.teachers.forEach((teacher) => teacherIdByKey.set(`${teacher.grade}|${norm(teacher.name)}`, teacher.id));
+  const studentByKey = new Map<string, Student>();
+  const gradeById = new Map(ref.grades.map((grade) => [grade.id, grade]));
+  const teacherById = new Map(ref.teachers.map((teacher) => [teacher.id, teacher]));
+  ref.students.forEach((student) => {
+    const grade = gradeById.get(student.grade);
+    const teacher = teacherById.get(student.teacher);
+    studentByKey.set(`${norm(student.name)}|${gradeToken(grade?.name || "")}|${norm(teacher?.name || "")}`, student);
+  });
+  const selectionByKey = new Map<string, MealSelection>();
+  ref.selections.forEach((selection) => {
+    const date = selection.lunch_date?.slice(0, 10);
+    if (date) selectionByKey.set(`${selection.student}|${date}`, selection);
+  });
+  const ruleByTeacher = new Map<string, string>();
+  const ruleByGrade = new Map<string, string>();
+  ref.rules.forEach((rule) => {
+    if (rule.teacher) ruleByTeacher.set(rule.teacher, rule.delivery_time);
+    else ruleByGrade.set(rule.grade, rule.delivery_time);
+  });
 
   for (const row of rows) {
-    if (row.status === "error")     { res.errors++;  continue; }
+    if (row.status === "error") { res.errors++; continue; }
     if (row.status === "duplicate") { res.skipped++; continue; }
-
-    const grade   = await e.ensureGrade(row.raw.gradeRaw);
-    const teacher = await e.ensureTeacher(grade.id, row.raw.teacherRaw);
-
-    if (row.raw.deliveryRaw?.trim()) {
-      const t = await e.ensureTime(row.raw.deliveryRaw);
-      if (t) await e.ensureRuleForTeacher(grade.id, teacher.id, t.id);
-    }
-
-    const { student, created } = await e.ensureStudent(
-      row.raw.name, grade.id, teacher.id, row.raw.gradeRaw, row.raw.teacherRaw,
-    );
-    if (created) res.createdStudents++;
-
-    const deliveryId = await e.deliveryTimeId(grade.id, teacher.id, row.raw.deliveryRaw ?? "");
-
-    const basePayload = {
-      student: student.id,
-      delivery_time: deliveryId,
-      parent: student.parent || null,
-      school: ctx.schoolId,
-    };
-
-    // ── Monday order ──────────────────────────────────────────────────────────
-    if (mondayKey && row.mondayMenuName) {
-      const menuItem = ref.menu.find(m => m.id === row.mondayMenuId) || e.menuByNorm.get(norm(row.raw.mondayMenuRaw ?? ""));
-      if (menuItem) {
-        const existing = e.selByKey.get(`${student.id}|${mondayKey}`);
-        const payload = { ...basePayload, lunch_date: e.lunchIsoFor(mondayKey), menu_item: menuItem.id };
-        if (existing) {
-          const res_ = row.mondayResolution ?? "keep";
-          if (res_ === "replace") {
-            await pb.collection("meal_selections").update(existing.id, payload);
-            res.replacedMeals++; res.imported++;
-          } else if (res_ === "add") {
-            await pb.collection("meal_selections").create<MealSelection>(payload);
-            res.createdMeals++; res.imported++;
-          } else {
-            res.skipped++;
-          }
-        } else {
-          const rec = await pb.collection("meal_selections").create<MealSelection>(payload);
-          e.selByKey.set(`${student.id}|${mondayKey}`, rec);
-          res.createdMeals++; res.imported++;
-        }
-      }
-    }
-
-    // ── Tuesday order ──────────────────────────────────────────────────────────
-    if (tuesdayKey && row.tuesdayMenuName) {
-      const menuItem = ref.menu.find(m => m.id === row.tuesdayMenuId) || e.menuByNorm.get(norm(row.raw.tuesdayMenuRaw ?? ""));
-      if (menuItem) {
-        const existing = e.selByKey.get(`${student.id}|${tuesdayKey}`);
-        const payload = { ...basePayload, lunch_date: e.lunchIsoFor(tuesdayKey), menu_item: menuItem.id };
-        if (existing) {
-          const res_ = row.tuesdayResolution ?? "keep";
-          if (res_ === "replace") {
-            await pb.collection("meal_selections").update(existing.id, payload);
-            res.replacedMeals++; res.imported++;
-          } else if (res_ === "add") {
-            await pb.collection("meal_selections").create<MealSelection>(payload);
-            res.createdMeals++; res.imported++;
-          } else {
-            res.skipped++;
-          }
-        } else {
-          const rec = await pb.collection("meal_selections").create<MealSelection>(payload);
-          e.selByKey.set(`${student.id}|${tuesdayKey}`, rec);
-          res.createdMeals++; res.imported++;
-        }
-      }
-    }
-
-    // ── Thursday order ──────────────────────────────────────────────────────────
-    if (thursdayKey && row.thursdayMenuName) {
-      const menuItem = ref.menu.find(m => m.id === row.thursdayMenuId) || e.menuByNorm.get(norm(row.raw.thursdayMenuRaw ?? ""));
-      if (menuItem) {
-        const existing = e.selByKey.get(`${student.id}|${thursdayKey}`);
-        const payload = { ...basePayload, lunch_date: e.lunchIsoFor(thursdayKey), menu_item: menuItem.id };
-        if (existing) {
-          const res_ = row.thursdayResolution ?? "keep";
-          if (res_ === "replace") {
-            await pb.collection("meal_selections").update(existing.id, payload);
-            res.replacedMeals++; res.imported++;
-          } else if (res_ === "add") {
-            await pb.collection("meal_selections").create<MealSelection>(payload);
-            res.createdMeals++; res.imported++;
-          } else {
-            res.skipped++;
-          }
-        } else {
-          const rec = await pb.collection("meal_selections").create<MealSelection>(payload);
-          e.selByKey.set(`${student.id}|${thursdayKey}`, rec);
-          res.createdMeals++; res.imported++;
-        }
-      }
-    }
-
-    // ── Friday order ──────────────────────────────────────────────────────────
-    if (fridayKey && row.fridayMenuName) {
-      const menuItem = ref.menu.find(m => m.id === row.fridayMenuId) || e.menuByNorm.get(norm(row.raw.fridayMenuRaw ?? ""));
-      if (menuItem) {
-        const existing = e.selByKey.get(`${student.id}|${fridayKey}`);
-        const payload = { ...basePayload, lunch_date: e.lunchIsoFor(fridayKey), menu_item: menuItem.id };
-        if (existing) {
-          const res_ = row.fridayResolution ?? "keep";
-          if (res_ === "replace") {
-            await pb.collection("meal_selections").update(existing.id, payload);
-            res.replacedMeals++; res.imported++;
-          } else if (res_ === "add") {
-            await pb.collection("meal_selections").create<MealSelection>(payload);
-            res.createdMeals++; res.imported++;
-          } else {
-            res.skipped++;
-          }
-        } else {
-          const rec = await pb.collection("meal_selections").create<MealSelection>(payload);
-          e.selByKey.set(`${student.id}|${fridayKey}`, rec);
-          res.createdMeals++; res.imported++;
-        }
-      }
-    }
-
-    // ── Wednesday order ───────────────────────────────────────────────────────
-    if (wednesdayKey && row.wednesdayMenuName) {
-      const menuItem = ref.menu.find(m => m.id === row.wednesdayMenuId) || e.menuByNorm.get(norm(row.raw.wednesdayMenuRaw ?? ""));
-      if (menuItem) {
-        const existing = e.selByKey.get(`${student.id}|${wednesdayKey}`);
-        const payload = { ...basePayload, lunch_date: e.lunchIsoFor(wednesdayKey), menu_item: menuItem.id };
-        if (existing) {
-          const res_ = row.wednesdayResolution ?? "keep";
-          if (res_ === "replace") {
-            await pb.collection("meal_selections").update(existing.id, payload);
-            res.replacedMeals++; res.imported++;
-          } else if (res_ === "add") {
-            await pb.collection("meal_selections").create<MealSelection>(payload);
-            res.createdMeals++; res.imported++;
-          } else {
-            res.skipped++;
-          }
-        } else {
-          const rec = await pb.collection("meal_selections").create<MealSelection>(payload);
-          e.selByKey.set(`${student.id}|${wednesdayKey}`, rec);
-          res.createdMeals++; res.imported++;
-        }
-      }
-    }
-
-    // Count the student row itself
-    if (!created) res.skipped++;
-    else res.imported++;
+    const gToken = gradeToken(row.raw.gradeRaw);
+    const tNorm = norm(row.raw.teacherRaw);
+    validRows.push({ row, gradeToken: gToken, teacherNorm: tNorm, studentKey: `${norm(row.raw.name)}|${gToken}|${tNorm}` });
   }
+
+  const maxGradeOrder = Math.max(0, ...ref.grades.map((grade) => grade.sort_order || 0));
+  const missingGrades = [...new Set(validRows.map((item) => item.gradeToken))]
+    .filter((token) => !gradeIdByToken.has(token));
+  const gradeRequests: BatchRequest[] = missingGrades.map((token, index) => {
+    const raw = validRows.find((item) => item.gradeToken === token)!.row.raw.gradeRaw;
+    return { method: "POST", url: "/api/collections/grades/records", body: {
+      name: gradeDisplayName(raw), sort_order: maxGradeOrder + index + 1, active: true, school: ctx.schoolId,
+    } };
+  });
+  const newGrades = await sendInBatches<Grade>("grades", gradeRequests, "Grade setup", committed);
+  newGrades.forEach((grade) => {
+    gradeByToken.set(gradeToken(grade.name), grade);
+    gradeIdByToken.set(gradeToken(grade.name), grade.id);
+  });
+
+  const missingTeachers = new Map<string, { gradeId: string; name: string; norm: string }>();
+  for (const item of validRows) {
+    const gradeId = gradeIdByToken.get(item.gradeToken)!;
+    const key = `${gradeId}|${item.teacherNorm}`;
+    if (!teacherIdByKey.has(key) && !missingTeachers.has(key)) {
+      missingTeachers.set(key, { gradeId, name: cleanName(item.row.raw.teacherRaw), norm: item.teacherNorm });
+    }
+  }
+  const teacherRequests: BatchRequest[] = [...missingTeachers.entries()].map(([, teacher]) => ({
+    method: "POST", url: "/api/collections/teachers/records", body: {
+      name: teacher.name, grade: teacher.gradeId, active: true, school: ctx.schoolId,
+    },
+  }));
+  const newTeachers = await sendInBatches<Teacher>("teachers", teacherRequests, "Teacher setup", committed);
+  newTeachers.forEach((teacher) => {
+    const key = `${teacher.grade}|${norm(teacher.name)}`;
+    teacherByKey.set(key, teacher);
+    teacherIdByKey.set(key, teacher.id);
+  });
+
+  const timeLabels = [...new Set(validRows.map((item) => item.row.raw.deliveryRaw?.trim() || "").filter(Boolean))];
+  const maxTimeOrder = Math.max(0, ...ref.times.map((time) => time.sort_order || 0));
+  const missingTimes = [...new Map(timeLabels
+    .filter((label) => !timeByNorm.has(norm(label)))
+    .map((label) => [norm(label), label])).values()];
+  const timeRequests: BatchRequest[] = missingTimes.map((label, index) => ({
+    method: "POST", url: "/api/collections/delivery_time_slots/records", body: {
+      label: cleanName(label), sort_order: maxTimeOrder + index + 1, active: true, school: ctx.schoolId,
+    },
+  }));
+  const newTimes = await sendInBatches<DeliveryTime>("delivery_time_slots", timeRequests, "Delivery time setup", committed);
+  newTimes.forEach((time) => timeByNorm.set(norm(time.label), time));
+
+  const newRules = new Map<string, { gradeId: string; teacherId: string; timeId: string }>();
+  for (const item of validRows) {
+    const gradeId = gradeIdByToken.get(item.gradeToken)!;
+    const teacherId = teacherIdByKey.get(`${gradeId}|${item.teacherNorm}`)!;
+    const rawTime = item.row.raw.deliveryRaw?.trim() || "";
+    const timeId = rawTime ? timeByNorm.get(norm(rawTime))?.id : undefined;
+    if (timeId && !ruleByTeacher.has(teacherId) && !newRules.has(teacherId)) {
+      newRules.set(teacherId, { gradeId, teacherId, timeId });
+    }
+  }
+  const ruleRequests: BatchRequest[] = [...newRules.values()].map((rule) => ({
+    method: "POST", url: "/api/collections/delivery_rules/records", body: {
+      grade: rule.gradeId, teacher: rule.teacherId, delivery_time: rule.timeId, school: ctx.schoolId,
+    },
+  }));
+  await sendInBatches("delivery_rules", ruleRequests, "Delivery rule setup", committed);
+  newRules.forEach((rule, teacherId) => ruleByTeacher.set(teacherId, rule.timeId));
+
+  const missingStudents = new Map<string, { name: string; gradeId: string; teacherId: string }>();
+  for (const item of validRows) {
+    if (studentByKey.has(item.studentKey) || missingStudents.has(item.studentKey)) continue;
+    const gradeId = gradeIdByToken.get(item.gradeToken)!;
+    const teacherId = teacherIdByKey.get(`${gradeId}|${item.teacherNorm}`)!;
+    missingStudents.set(item.studentKey, { name: cleanName(item.row.raw.name), gradeId, teacherId });
+  }
+  const studentRequests: BatchRequest[] = [...missingStudents.values()].map((student) => ({
+    method: "POST", url: "/api/collections/students/records", body: {
+      name: student.name, grade: student.gradeId, teacher: student.teacherId, active: true, school: ctx.schoolId,
+    },
+  }));
+  const newStudents = await sendInBatches<Student>("students", studentRequests, "Student roster", committed);
+  const missingKeys = [...missingStudents.keys()];
+  newStudents.forEach((student, index) => {
+    const key = missingKeys[index];
+    if (key) studentByKey.set(key, student);
+    res.createdStudents++;
+  });
+
+  const mealRequests: BatchRequest[] = [];
+  const mealEffects: Array<"created" | "replaced"> = [];
+  const days: Array<{ field: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" }> = [
+    { field: "monday" }, { field: "tuesday" }, { field: "wednesday" },
+    { field: "thursday" }, { field: "friday" },
+  ];
+
+  for (const item of validRows) {
+    const row = item.row;
+    const student = studentByKey.get(item.studentKey);
+    if (!student) throw new ImportExecutionError("Could not resolve an imported student.", "Meal selections", committed.count);
+    const gradeId = gradeIdByToken.get(item.gradeToken)!;
+    const teacherId = teacherIdByKey.get(`${gradeId}|${item.teacherNorm}`)!;
+    const rawDelivery = row.raw.deliveryRaw?.trim() || "";
+    const deliveryId = rawDelivery
+      ? timeByNorm.get(norm(rawDelivery))?.id || null
+      : ruleByTeacher.get(teacherId) || ruleByGrade.get(gradeId) || null;
+
+    for (const { field } of days) {
+      const date = dateByDay[field];
+      const mealName = row[`${field}MenuName` as keyof AnalyzedRow] as string | undefined;
+      if (!date || !mealName) continue;
+      const menuId = row[`${field}MenuId` as keyof AnalyzedRow] as string | undefined;
+      const rawMeal = row.raw[`${field}MenuRaw` as keyof typeof row.raw] as string | undefined;
+      const menu = (menuId && menuById.get(menuId)) || menuByNorm.get(norm(rawMeal || ""));
+      if (!menu) continue;
+
+      const existing = selectionByKey.get(`${student.id}|${date}`);
+      const resolutionKey = `${field}Resolution` as keyof AnalyzedRow;
+      const resolution = (row[resolutionKey] as "keep" | "replace" | "add" | undefined) || "keep";
+      const body = {
+        student: student.id, delivery_time: deliveryId, parent: student.parent || null,
+        school: ctx.schoolId, lunch_date: `${date}T12:00:00.000Z`, menu_item: menu.id,
+      };
+
+      if (existing) {
+        if (resolution === "replace") {
+          mealRequests.push({ method: "PATCH", url: `/api/collections/meal_selections/records/${existing.id}`, body });
+          mealEffects.push("replaced");
+        } else if (resolution === "add") {
+          mealRequests.push({ method: "POST", url: "/api/collections/meal_selections/records", body });
+          mealEffects.push("created");
+        } else {
+          res.skipped++;
+        }
+      } else {
+        mealRequests.push({ method: "POST", url: "/api/collections/meal_selections/records", body });
+        mealEffects.push("created");
+      }
+    }
+    if (missingStudents.has(item.studentKey)) res.imported++;
+    else res.skipped++;
+  }
+
+  await sendInBatches("meal_selections", mealRequests, "Meal selections", committed);
+  mealEffects.forEach((effect) => {
+    if (effect === "created") { res.createdMeals++; res.imported++; }
+    else { res.replacedMeals++; res.imported++; }
+  });
 
   return res;
 }
