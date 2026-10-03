@@ -51,10 +51,10 @@ Version 1.1.0 verified:
 - Local SMTP integration verifies email disabled by default, enabled CHS password reset delivery with CHS frontend link, and suppression of sample user mail. No real email sent by tests.
 - Real PocketHost upgrade, DNS, CSV migration, provider SMTP credentials and inbox delivery are still deployment work. No live database or domain was changed by this implementation.
 
-## Version 1.2.1 batched CSV imports
+## Version 1.2.1 batched CSV imports and purge
 
 - PocketBase 0.28.4 source confirms the transactional `/api/batch` endpoint is available at the hosted compatibility baseline.
-- Unit regressions verify batched create/update requests, 40-write chunking, all five weekdays and conflict keep/replace behavior.
-- Local PocketBase integration verifies a school admin can create records through a batch and a cross-school failure rolls back earlier writes in the same batch.
+- Unit regressions verify batched create/update/delete requests, 40-write chunking, 429 retry, 85-record purge chunking, all five weekdays and conflict keep/replace behavior.
+- Local PocketBase integration verifies a school admin can create and delete records through a batch and a cross-school failure rolls back earlier writes in the same batch.
 - `npm test`, the frontend TypeScript check, production build and shared-school/SMTP integration pass. Vite build needs `SWC_NATIVE_BINDING_CACHE` set to a writable cache directory in this restricted environment.
-- The PocketBase Batch API must be enabled once in the shared instance's superuser Settings → Application; no live hosted records or settings were changed here.
+- The PocketBase Batch API must be enabled once in the shared instance's superuser Settings → Application for imports and purge; no live hosted records or settings were changed here.
