@@ -5,6 +5,7 @@ import { Card, Button, Input, Field, Spinner, useToast } from "../../components/
 import { PageHeader } from "../../components/PageHeader";
 import { useSemester } from "../../lib/SemesterContext";
 import { ORDERING_DAYS, DEFAULT_ORDERING_DAYS, orderingDayText, type OrderingDay } from "../../lib/semester";
+import { BatchWriteError, sendBatchRequests, type BatchProgress, type BatchRequest } from "../../lib/pocketbaseBatch";
 import type { Settings as SettingsType } from "../../lib/types";
 
 const ADJS = ["swift", "calm", "bold", "dark", "iron", "gold", "silver", "brave", "clear", "deep", "bright", "firm"];
@@ -120,35 +121,47 @@ export default function Settings() {
   const purge = async () => {
     if (!match || !anyChecked) return;
     setPurging(true);
-    let deleted = 0;
+    const progress: BatchProgress = { count: 0, records: 0 };
+    let activeStage = "Preparing purge";
     try {
-      // Order matters: meal_selections before students, teachers last
+      const deleteRecords = async (collection: string, label: string) => {
+        activeStage = label;
+        const records = await pb.collection(collection).getFullList<{ id: string }>({ requestKey: null, fields: "id" });
+        const requests: BatchRequest[] = records.map((record) => ({
+          method: "DELETE",
+          url: `/api/collections/${collection}/records/${record.id}`,
+        }));
+        await sendBatchRequests(requests, label, progress);
+      };
+
+      // Keep dependencies in order: meals first, then students, teachers and menu.
       if (purgeTargets.orders || purgeTargets.students) {
-        const sels = await pb.collection("meal_selections").getFullList({ requestKey: null, fields: "id" });
-        for (const r of sels) { await pb.collection("meal_selections").delete(r.id); deleted++; }
+        await deleteRecords("meal_selections", "Meal selections");
       }
       if (purgeTargets.orders) {
-        const logs = await pb.collection("audit_log").getFullList({ requestKey: null, fields: "id" });
-        for (const r of logs) { await pb.collection("audit_log").delete(r.id); deleted++; }
+        await deleteRecords("audit_log", "Admin audit log");
       }
       if (purgeTargets.students) {
-        const stus = await pb.collection("students").getFullList({ requestKey: null, fields: "id" });
-        for (const r of stus) { await pb.collection("students").delete(r.id); deleted++; }
+        await deleteRecords("students", "Students");
       }
       if (purgeTargets.teachers) {
-        const tchs = await pb.collection("teachers").getFullList({ requestKey: null, fields: "id" });
-        for (const r of tchs) { await pb.collection("teachers").delete(r.id); deleted++; }
+        await deleteRecords("teachers", "Teachers");
       }
       if (purgeTargets.menu) {
-        const mnuItems = await pb.collection("menu_items").getFullList({ requestKey: null, fields: "id" });
-        for (const r of mnuItems) { await pb.collection("menu_items").delete(r.id); deleted++; }
+        await deleteRecords("menu_items", "Menu items");
       }
       setTyped("");
       await loadCounts();
-      toast(`Purged ${deleted} record${deleted !== 1 ? "s" : ""} successfully.`);
-    } catch {
-      await loadCounts();
-      toast("Purge failed or partially completed. Check records.", "error");
+      toast(`Purged ${progress.records || 0} record${progress.records !== 1 ? "s" : ""} successfully.`);
+    } catch (error) {
+      try { await loadCounts(); } catch { /* Keep the purge error visible if refresh also fails. */ }
+      const completed = progress.records || 0;
+      const partial = completed ? ` ${completed} records in ${progress.count} batches were deleted before it stopped.` : " No records were confirmed deleted.";
+      const stage = error instanceof BatchWriteError ? error.stage : activeStage;
+      const detail = error instanceof Error && /Batch requests are not allowed/i.test(error.message)
+        ? " Enable PocketBase Batch API in Dashboard → Settings → Application."
+        : " Refresh the counts and inspect the selected records before retrying.";
+      toast(`Purge stopped during ${stage}.${partial}${detail}`, "error");
     } finally {
       setPurging(false);
     }
