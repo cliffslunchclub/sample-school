@@ -25,9 +25,12 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       release_id: ${{ steps.release.outputs.id }}
+      deploy_safe: ${{ steps.source_type.outputs.deploy_safe }}
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -35,6 +38,21 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+
+      - name: Check for backend changes that need a separate PocketBase upload
+        id: source_type
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_BEFORE: ${{ github.event.before }}
+        run: |
+          if [[ "$EVENT_NAME" != "push" || -z "$EVENT_BEFORE" || "$EVENT_BEFORE" =~ ^0+$ ]]; then
+            echo "deploy_safe=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "$EVENT_BEFORE" "$GITHUB_SHA" | grep -Eq '^(pb_hooks|pb_migrations)/'; then
+            echo "deploy_safe=false" >> "$GITHUB_OUTPUT"
+            echo "PocketBase hooks or migrations changed. Frontend ZIPs will be built, but live uploads are skipped until the backend update is handled separately."
+          else
+            echo "deploy_safe=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Install frontend dependencies
         run: npm ci --prefix frontend
@@ -74,7 +92,7 @@ jobs:
   deploy-sample:
     name: Deploy Sample School
     needs: package
-    if: ${{ vars.ENABLE_SITEGROUND_DEPLOY == 'true' }}
+    if: ${{ vars.ENABLE_SITEGROUND_DEPLOY == 'true' && needs.package.outputs.deploy_safe == 'true' }}
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -86,6 +104,26 @@ jobs:
 
       - name: Unpack site files
         run: unzip -q "packages/Sample-School-${{ needs.package.outputs.release_id }}.zip" -d siteground
+
+      - name: Check SiteGround destination settings
+        env:
+          FTP_SERVER: ${{ secrets.SAMPLE_SG_FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.SAMPLE_SG_FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.SAMPLE_SG_FTP_PASSWORD }}
+          FTP_DIR: ${{ vars.SAMPLE_SG_FTP_DIR }}
+        run: |
+          test -n "$FTP_SERVER" && test -n "$FTP_USERNAME" && test -n "$FTP_PASSWORD" && test -n "$FTP_DIR"
+          [[ "$FTP_DIR" == */ ]] || { echo "Sample remote directory must end with /"; exit 1; }
+
+      - name: Check SiteGround destination settings
+        env:
+          FTP_SERVER: ${{ secrets.CHS_SG_FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.CHS_SG_FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.CHS_SG_FTP_PASSWORD }}
+          FTP_DIR: ${{ vars.CHS_SG_FTP_DIR }}
+        run: |
+          test -n "$FTP_SERVER" && test -n "$FTP_USERNAME" && test -n "$FTP_PASSWORD" && test -n "$FTP_DIR"
+          [[ "$FTP_DIR" == */ ]] || { echo "CHS remote directory must end with /"; exit 1; }
 
       - name: Upload to SiteGround over FTPS
         uses: SamKirkland/FTP-Deploy-Action@v4.4.0
