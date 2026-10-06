@@ -1,0 +1,128 @@
+name: Build and deploy school sites
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - "scripts/**"
+      - "pb_hooks/**"
+      - "pb_migrations/**"
+      - "package.json"
+      - ".github/workflows/deploy-siteground.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: siteground-production
+  cancel-in-progress: false
+
+jobs:
+  package:
+    name: Test and package both school sites
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.release.outputs.id }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+
+      - name: Run app regression checks
+        run: npm test
+
+      - name: Run TypeScript check
+        run: ./frontend/node_modules/.bin/tsc --noEmit -p frontend/tsconfig.app.json
+
+      - name: Prepare versioned site packages
+        id: release
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          short_sha="${GITHUB_SHA::7}"
+          release_id="v${version}-${short_sha}"
+          echo "id=$release_id" >> "$GITHUB_OUTPUT"
+
+          npm run deploy:prepare -- --target sample --api-url https://clc-schools.pockethost.io --release "$release_id"
+          npm run deploy:prepare -- --target chs --api-url https://clc-schools.pockethost.io --release "$release_id"
+
+          (cd ".deploy/sample/$release_id/siteground" && zip -q -r "$GITHUB_WORKSPACE/Sample-School-$release_id.zip" .)
+          (cd ".deploy/chs/$release_id/siteground" && zip -q -r "$GITHUB_WORKSPACE/Cherry-Hill-$release_id.zip" .)
+
+      - name: Save versioned ZIPs to this workflow run
+        uses: actions/upload-artifact@v4
+        with:
+          name: siteground-${{ github.sha }}
+          path: |
+            Sample-School-${{ steps.release.outputs.id }}.zip
+            Cherry-Hill-${{ steps.release.outputs.id }}.zip
+          if-no-files-found: error
+          retention-days: 90
+
+  deploy-sample:
+    name: Deploy Sample School
+    needs: package
+    if: ${{ vars.ENABLE_SITEGROUND_DEPLOY == 'true' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Download versioned ZIP
+        uses: actions/download-artifact@v4
+        with:
+          name: siteground-${{ github.sha }}
+          path: packages
+
+      - name: Unpack site files
+        run: unzip -q "packages/Sample-School-${{ needs.package.outputs.release_id }}.zip" -d siteground
+
+      - name: Upload to SiteGround over FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: ${{ secrets.SAMPLE_SG_FTP_SERVER }}
+          username: ${{ secrets.SAMPLE_SG_FTP_USERNAME }}
+          password: ${{ secrets.SAMPLE_SG_FTP_PASSWORD }}
+          protocol: ftps
+          port: ${{ vars.SITEGROUND_FTP_PORT || '21' }}
+          security: strict
+          local-dir: siteground/
+          server-dir: ${{ vars.SAMPLE_SG_FTP_DIR }}
+
+  deploy-chs:
+    name: Deploy Cherry Hill
+    needs: package
+    if: ${{ vars.ENABLE_SITEGROUND_DEPLOY == 'true' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Download versioned ZIP
+        uses: actions/download-artifact@v4
+        with:
+          name: siteground-${{ github.sha }}
+          path: packages
+
+      - name: Unpack site files
+        run: unzip -q "packages/Cherry-Hill-${{ needs.package.outputs.release_id }}.zip" -d siteground
+
+      - name: Upload to SiteGround over FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: ${{ secrets.CHS_SG_FTP_SERVER }}
+          username: ${{ secrets.CHS_SG_FTP_USERNAME }}
+          password: ${{ secrets.CHS_SG_FTP_PASSWORD }}
+          protocol: ftps
+          port: ${{ vars.SITEGROUND_FTP_PORT || '21' }}
+          security: strict
+          local-dir: siteground/
+          server-dir: ${{ vars.CHS_SG_FTP_DIR }}
