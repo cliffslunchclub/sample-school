@@ -66,8 +66,30 @@ Each batch is transactional. If a batch fails, that batch rolls back. Imports an
 
 Menu CSV uploads are separate from roster/order imports. The Menu page downloads the menu template, previews additions and existing-item matches, and requires confirmation. Existing matches default to Keep Existing; updating a match is an explicit choice. Rows omitted from the file are left alone. Menu uploads use the same PocketBase Batch API setting.
 
+## Automatic SiteGround frontend deployment
+
+The GitHub Actions workflow at `.github/workflows/deploy-siteground.yml` tests and packages both frontends when code is pushed to `main`. It creates versioned Sample and Cherry Hill ZIPs as workflow artifacts, retained for 90 days. After setup, a successful frontend-only update can publish to both SiteGround document roots over FTPS. The workflow does not upload PocketBase hooks or migrations.
+
+Before enabling production uploads:
+
+1. In the repository, open **Settings → Environments** and create an environment named `production`.
+2. Add these **environment secrets** using SiteGround FTP accounts scoped to the matching site's document root. Use the FTPS server name and credentials from Site Tools → Site → FTP Accounts:
+   - `SAMPLE_SG_FTP_SERVER`, `SAMPLE_SG_FTP_USERNAME`, `SAMPLE_SG_FTP_PASSWORD`
+   - `CHS_SG_FTP_SERVER`, `CHS_SG_FTP_USERNAME`, `CHS_SG_FTP_PASSWORD`
+3. Add these **environment variables**:
+   - `SAMPLE_SG_FTP_DIR`: Sample site's document root as seen by its FTP account, ending in `/`
+   - `CHS_SG_FTP_DIR`: Cherry Hill site's document root as seen by its FTP account, ending in `/`
+   - `SITEGROUND_FTP_PORT`: `21` (optional; this is the default)
+4. Add the repository variable `ENABLE_SITEGROUND_DEPLOY` with value `true`.
+
+The upload job is skipped until the repository variable is set. Never put FTP passwords in workflow files or share them in chat. Check that each account and remote directory point only to the intended site's document root before enabling the variable. The workflow checks that credentials and destination paths are present and requires FTPS certificate validation.
+
+After setup, pushes to `main` that change app, deployment, or backend source run tests and create ZIP artifacts. Pushes that change PocketBase hooks or migrations skip automatic live frontend uploads; deploy those backend changes separately using the maintenance and backup steps above, then use **Actions → Build and deploy school sites → Run workflow** if the matching frontend packages should be published. The workflow only uploads static frontend files. It never changes DNS, PocketBase data, SMTP, hooks, or migrations.
+
 ## Updates and recovery
 
-Build both frontends from the same fixed commit, with the same backend URL and different target slugs. Test the backend locally first; a shared backend update affects both schools immediately. Back up the whole database, use maintenance for incompatible updates, upload the common backend once, then upload both frontends. Verify manifests and both school workflows. Hosting uploads remain manual; no automatic GitHub deployment is configured.
+Test the backend locally first; a shared backend update affects both schools immediately. Back up the whole database and use maintenance for incompatible backend updates. For manual recovery, build both frontends from the same fixed commit, with the same backend URL and different target slugs; upload the common backend once, then upload both frontends. Verify release manifests and both school workflows.
+
+Rollback only with compatible code/schema; for this isolation upgrade restore a full tested backup with its matching old hooks/frontends if necessary. Restoring a shared backup restores both schools and loses writes since that backup. Do not reverse the isolation migration or rerun historical migrations. Never deploy the sample seed scripts into the old Coderick database.
 
 Rollback only with compatible code/schema; for this isolation upgrade restore a full tested backup with its matching old hooks/frontends if necessary. Restoring a shared backup restores both schools and loses writes since that backup. Do not reverse the isolation migration or rerun historical migrations. Never deploy the sample seed scripts into the old Coderick database.
