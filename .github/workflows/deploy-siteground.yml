@@ -140,7 +140,7 @@ jobs:
   deploy-chs:
     name: Deploy Cherry Hill
     needs: package
-    if: ${{ vars.ENABLE_SITEGROUND_DEPLOY == 'true' }}
+    if: ${{ vars.ENABLE_SITEGROUND_DEPLOY == 'true' && needs.package.outputs.deploy_safe == 'true' }}
     runs-on: ubuntu-latest
     environment: production
     steps:
