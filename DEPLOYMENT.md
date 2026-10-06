@@ -17,8 +17,8 @@ Use the exact GitHub commit intended for deployment. PocketBase compatibility ba
 npm test
 npm run test:integration
 npx --prefix frontend tsc --noEmit -p frontend/tsconfig.app.json
-npm run deploy:prepare -- --target sample --api-url https://clc-sample-school.pockethost.io --release RELEASE
-npm run deploy:prepare -- --target chs --api-url https://clc-sample-school.pockethost.io --release RELEASE
+npm run deploy:prepare -- --target sample --api-url https://clc-schools.pockethost.io --release RELEASE
+npm run deploy:prepare -- --target chs --api-url https://clc-schools.pockethost.io --release RELEASE
 ```
 
 Replace RELEASE with the actual commit/tag. Integration tests require Python 3 and the local PocketBase binary (run npm start once to download, or set POCKETBASE_BINARY). They use disposable local databases and local SMTP only.
