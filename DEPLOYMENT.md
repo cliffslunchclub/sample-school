@@ -1,6 +1,6 @@
 # SiteGround + one shared PocketHost backend
 
-Version 1.2.2 uses one PocketBase instance for both school sites. Keep the existing shared PocketHost instance at `https://clc-schools.pockethost.io`.
+Version 1.2.3 uses one PocketBase instance for both school sites. Keep the existing shared PocketHost instance at `https://clc-schools.pockethost.io`.
 
 | Frontend | Build target / school slug | Backend |
 | --- | --- | --- |
@@ -70,6 +70,8 @@ Menu CSV uploads are separate from roster/order imports. The Menu page downloads
 
 The GitHub Actions workflow at `.github/workflows/deploy-siteground.yml` tests and packages both frontends when code is pushed to `main`. It creates versioned Sample and Cherry Hill ZIPs as workflow artifacts, retained for 90 days. After setup, a successful frontend-only update can publish to both SiteGround document roots over FTPS. The workflow does not upload PocketBase hooks or migrations.
 
+The generated `.htaccess` sets `Cache-Control: no-cache` by default so page requests revalidate and pick up new entry files. Fingerprinted JS and CSS files receive a one-year immutable cache lifetime; their filenames change when their contents change. SiteGround CDN honors these standard `Cache-Control` headers when enabled. When first introducing this policy, purge the CDN cache once to clear any entry page stored under the old policy. Already-open tabs still need to reload.
+
 Before enabling production uploads:
 
 1. In the repository, open **Settings → Environments** and create an environment named `production`.
@@ -89,7 +91,5 @@ After setup, pushes to `main` that change app, deployment, or backend source run
 ## Updates and recovery
 
 Test the backend locally first; a shared backend update affects both schools immediately. Back up the whole database and use maintenance for incompatible backend updates. For manual recovery, build both frontends from the same fixed commit, with the same backend URL and different target slugs; upload the common backend once, then upload both frontends. Verify release manifests and both school workflows.
-
-Rollback only with compatible code/schema; for this isolation upgrade restore a full tested backup with its matching old hooks/frontends if necessary. Restoring a shared backup restores both schools and loses writes since that backup. Do not reverse the isolation migration or rerun historical migrations. Never deploy the sample seed scripts into the old Coderick database.
 
 Rollback only with compatible code/schema; for this isolation upgrade restore a full tested backup with its matching old hooks/frontends if necessary. Restoring a shared backup restores both schools and loses writes since that backup. Do not reverse the isolation migration or rerun historical migrations. Never deploy the sample seed scripts into the old Coderick database.
