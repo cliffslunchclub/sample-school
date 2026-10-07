@@ -1,6 +1,6 @@
 # SiteGround + one shared PocketHost backend
 
-Version 1.2.2 uses one PocketBase instance for both school sites. Keep the existing shared PocketHost instance at `https://clc-schools.pockethost.io`.
+Version 1.2.3 uses one PocketBase instance for both school sites. Keep the existing shared PocketHost instance at `https://clc-schools.pockethost.io`.
 
 | Frontend | Build target / school slug | Backend |
 | --- | --- | --- |
@@ -69,6 +69,8 @@ Menu CSV uploads are separate from roster/order imports. The Menu page downloads
 ## Automatic SiteGround frontend deployment
 
 The GitHub Actions workflow at `.github/workflows/deploy-siteground.yml` tests and packages both frontends when code is pushed to `main`. It creates versioned Sample and Cherry Hill ZIPs as workflow artifacts, retained for 90 days. After setup, a successful frontend-only update can publish to both SiteGround document roots over FTPS. The workflow does not upload PocketBase hooks or migrations.
+
+The generated `.htaccess` sets `Cache-Control: no-cache` by default so page requests revalidate and pick up new entry files. Fingerprinted JS and CSS files receive a one-year immutable cache lifetime; their filenames change when their contents change. SiteGround CDN honors these standard `Cache-Control` headers when enabled. When first introducing this policy, purge the CDN cache once to clear any entry page stored under the old policy. Already-open tabs still need to reload.
 
 Before enabling production uploads:
 
