@@ -55,7 +55,10 @@ try {
   cpSync(path.join(root, 'frontend/dist'), site, { recursive: true });
   const indexFile = path.join(site, 'index.html');
   writeFileSync(indexFile, readFileSync(indexFile, 'utf8').replace(/<title>[^<]*<\/title>/, `<title>${profile.title}</title>`));
-  writeFileSync(path.join(site, '.htaccess'), '<IfModule mod_rewrite.c>\nRewriteEngine On\nRewriteCond %{REQUEST_FILENAME} !-f\nRewriteCond %{REQUEST_FILENAME} !-d\nRewriteRule ^ index.html [L]\n</IfModule>\n');
+  // Revalidate HTML on every visit so browsers/CDN pick up new entry points.
+  // Vite's fingerprinted JS/CSS can stay cached for a year because their names
+  // change whenever their contents change.
+  writeFileSync(path.join(site, '.htaccess'), '<IfModule mod_headers.c>\nHeader set Cache-Control "no-cache"\n<FilesMatch "^.*-[A-Za-z0-9_-]{8,}\\.(js|css)$">\n  Header set Cache-Control "public, max-age=31536000, immutable"\n</FilesMatch>\n</IfModule>\n\n<IfModule mod_rewrite.c>\nRewriteEngine On\nRewriteCond %{REQUEST_FILENAME} !-f\nRewriteCond %{REQUEST_FILENAME} !-d\nRewriteRule ^ index.html [L]\n</IfModule>\n');
   // Same source digest across target packages proves both were prepared from the
   // same code, even though their public API URLs and installation profiles differ.
   const hash = createHash('sha256');
