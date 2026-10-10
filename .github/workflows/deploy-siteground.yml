@@ -149,6 +149,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
+      - name: Check out deployment diagnostics
+        uses: actions/checkout@v4
+
       - name: Download versioned ZIP
         uses: actions/download-artifact@v4
         with:
@@ -167,9 +170,6 @@ jobs:
         run: |
           test -n "$FTP_SERVER" && test -n "$FTP_USERNAME" && test -n "$FTP_PASSWORD" && test -n "$FTP_DIR"
           [[ "$FTP_DIR" == */ ]] || { echo "Sample remote directory must end with /"; exit 1; }
-
-      - name: Check out deployment diagnostics
-        uses: actions/checkout@v4
 
       - name: Resolve verified school document root
         id: destination
@@ -201,6 +201,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
+      - name: Check out deployment diagnostics
+        uses: actions/checkout@v4
+
       - name: Download versioned ZIP
         uses: actions/download-artifact@v4
         with:
@@ -219,9 +222,6 @@ jobs:
         run: |
           test -n "$FTP_SERVER" && test -n "$FTP_USERNAME" && test -n "$FTP_PASSWORD" && test -n "$FTP_DIR"
           [[ "$FTP_DIR" == */ ]] || { echo "CHS remote directory must end with /"; exit 1; }
-
-      - name: Check out deployment diagnostics
-        uses: actions/checkout@v4
 
       - name: Resolve verified school document root
         id: destination

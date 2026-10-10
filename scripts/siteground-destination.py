@@ -24,4 +24,5 @@ if resolved is None:
         resolved=configured;print('Configured folder matches school release:',info.get('version'))
     else:raise SystemExit('Could not verify this FTP destination belongs to the expected school. Check its scoped document root.')
 with open(os.environ['GITHUB_OUTPUT'],'a') as out:out.write('dir='+resolved+'\n')
-ftp.quit()
+try:ftp.quit()
+except (OSError,EOFError):ftp.close()
