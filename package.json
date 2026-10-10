@@ -3,12 +3,13 @@
   "private": true,
   "scripts": {
     "start": "node scripts/start.mjs",
-    "test": "node scripts/test.mjs && node scripts/deploy-test.mjs",
+    "test": "node scripts/test.mjs && node scripts/deploy-test.mjs && node scripts/demo-client-test.mjs",
     "deploy:prepare": "node scripts/prepare-deployment.mjs",
-    "test:integration": "python3 scripts/shared-school-test.py"
+    "test:integration": "python3 scripts/shared-school-test.py",
+    "test:demo": "python3 scripts/demo-test.py"
   },
   "engines": {
     "node": ">=22.12.0"
   },
-  "version": "1.2.3"
+  "version": "1.3.0"
 }

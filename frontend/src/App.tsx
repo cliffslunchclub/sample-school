@@ -1,6 +1,6 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider, useAuth } from "./lib/auth";
-import { ToastProvider, Spinner } from "./components/ui";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "./lib/auth";
+import { ToastProvider } from "./components/ui";
 import { RequireParent, RequireAdmin } from "./components/guards";
 
 import Login from "./pages/auth/Login";
@@ -36,12 +36,8 @@ import Labels from "./pages/admin/Labels";
 
 import NotFound from "./pages/NotFound";
 
-function Landing() {
-  const { user, loading } = useAuth();
-  if (loading) return <Spinner label="Loading…" />;
-  if (user) return <Navigate to={user.role === "admin" ? "/admin" : "/menu"} replace />;
-  return <Navigate to="/login" replace />;
-}
+import Landing from "./pages/Landing";
+import GuestMenu from "./pages/GuestMenu";
 
 const App = () => (
   <ToastProvider>
@@ -49,6 +45,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/guest-menu" element={<GuestMenu />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -104,3 +101,4 @@ const App = () => (
 );
 
 export default App;
+

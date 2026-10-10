@@ -1,3 +1,4 @@
+import { isSampleSite, demoEmail, DEMO_PASSWORD } from "../../lib/site";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthShell } from "../../components/AuthShell";
@@ -39,7 +40,12 @@ export default function Login() {
         </>
       }
     >
+      <p className="mb-4 text-center"><Link to="/" className="text-sm font-bold text-leaf-700 hover:underline">Back to home</Link></p>
       <form onSubmit={submit} className="space-y-4">
+        {isSampleSite && <div className="rounded-xl border border-leaf-200 bg-leaf-50 p-4 text-sm">
+          <p className="mb-3 text-ink-soft">Explore with sample data. Changes cannot be saved.</p>
+          <Button type="button" variant="outline" className="w-full" onClick={() => { setEmail(demoEmail("parent")); setPassword(DEMO_PASSWORD); setError(""); }}>Try Parent Demo</Button>
+        </div>}
         {error && (
           <div className="rounded-xl bg-tomato-50 px-4 py-3 text-sm font-semibold text-tomato-600">
             {error}
@@ -71,3 +77,4 @@ export default function Login() {
     </AuthShell>
   );
 }
+

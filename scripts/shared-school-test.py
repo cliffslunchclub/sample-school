@@ -7,14 +7,15 @@ PASSWORD='IntegrationOnly2026!'
 with tempfile.TemporaryDirectory(prefix='clc-isolation-') as tmp:
  tmp=pathlib.Path(tmp);data=tmp/'data';old=tmp/'old';old.mkdir()
  for f in (ROOT/'pb_migrations').glob('*.js'):
-  if f.name!='2000000040_shared_schools.js':shutil.copy(f,old/f.name)
+  if f.name not in ['2000000040_shared_schools.js','2000000050_read_only_public_demo.js']:shutil.copy(f,old/f.name)
  def run(*args):subprocess.run([str(BINARY),*args],cwd=ROOT,check=True,stdout=subprocess.DEVNULL)
  run('migrate','up','--dir='+str(data),'--migrationsDir='+str(old))
  def snapshot():
   with sqlite3.connect(data/'data.db') as db:
    return {name:db.execute('SELECT * FROM '+name+' ORDER BY id').fetchall() for name in ['users','students','meal_selections','settings','menu_items','audit_log','parent_audit_log']}
  before=snapshot()
- run('migrate','up','--dir='+str(data),'--migrationsDir='+str(ROOT/'pb_migrations'))
+ shutil.copy(ROOT/'pb_migrations/2000000040_shared_schools.js',old/'2000000040_shared_schools.js')
+ run('migrate','up','--dir='+str(data),'--migrationsDir='+str(old))
  after=snapshot()
  for name in before:
   if name=='settings':assert all(row in after[name] for row in before[name])
@@ -23,7 +24,7 @@ with tempfile.TemporaryDirectory(prefix='clc-isolation-') as tmp:
  sock=socket.socket();sock.bind(('127.0.0.1',0));port=sock.getsockname()[1];sock.close()
  base='http://127.0.0.1:'+str(port)
  log=open(tmp/'server.log','w+')
- proc=subprocess.Popen([str(BINARY),'serve','--http=127.0.0.1:'+str(port),'--dir='+str(data),'--hooksDir='+str(ROOT/'pb_hooks'),'--migrationsDir='+str(ROOT/'pb_migrations')],cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,env={**os.environ,'TZ':'UTC'})
+ proc=subprocess.Popen([str(BINARY),'serve','--http=127.0.0.1:'+str(port),'--dir='+str(data),'--hooksDir='+str(ROOT/'pb_hooks'),'--migrationsDir='+str(old)],cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,env={**os.environ,'TZ':'UTC'})
  def req(path,body=None,token='',slug='sample',method=None):
   r=urllib.request.Request(base+path,data=json.dumps(body).encode() if body is not None else None,headers={'Content-Type':'application/json','Authorization':token,'X-School-Slug':slug},method=method)
   try:
@@ -159,3 +160,4 @@ with tempfile.TemporaryDirectory(prefix='clc-isolation-') as tmp:
   smtp.shutdown();smtp.server_close()
  finally:
   proc.terminate();proc.wait(timeout=10);log.close()
+

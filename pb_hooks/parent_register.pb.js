@@ -1,5 +1,8 @@
 routerAdd("POST", "/api/register-parent", (e) => {
+  require(__hooks+"/demo-access.js").guard(e)
+
   const info = e.requestInfo()
+  if (String(info.headers.x_school_slug || "") === "sample") return e.json(403,{message:"This is a demo site. Changes cannot be saved."})
   const body = info.body || {}
 
   const firstName = (body.first_name || "").toString().trim()
@@ -63,3 +66,4 @@ routerAdd("POST", "/api/register-parent", (e) => {
     return e.json(500, { message: "Could not create account. Please try again." })
   }
 })
+

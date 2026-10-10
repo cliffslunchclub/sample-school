@@ -6,16 +6,19 @@ import type { MenuItem } from "../../lib/types";
 
 import { WEEKDAYS } from "../../lib/semester";
 
-export default function ParentMenu() {
+export default function ParentMenu({ guest = false }: { guest?: boolean }) {
   const [items, setItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    pb.collection("menu_items")
-      .getFullList<MenuItem>({ filter: "active = true", sort: "name", requestKey: null })
-      .then((res) => { setItems(res); setLoading(false); });
-  }, []);
+    const request = guest
+      ? pb.send("/api/public-menu", { method: "GET", requestKey: null }).then((result: { items: MenuItem[] }) => result.items)
+      : pb.collection("menu_items").getFullList<MenuItem>({ filter: "active = true", sort: "name", requestKey: null });
+    request.then(setItems).catch(() => setError("The menu could not be loaded. Please try again.")).finally(() => setLoading(false));
+  }, [guest]);
 
+  if (error) return <p role="alert" className="text-tomato-600">{error}</p>;
   if (loading) return <Spinner label="Loading menu…" />;
 
 
@@ -71,3 +74,4 @@ function DaySection({ day, items }: { day: string; items: MenuItem[] }) {
     </section>
   );
 }
+

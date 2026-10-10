@@ -1,6 +1,6 @@
 # SiteGround + one shared PocketHost backend
 
-Version 1.2.3 uses one PocketBase instance for both school sites. Keep the existing shared PocketHost instance at `https://clc-schools.pockethost.io`.
+Version 1.3.0 uses one PocketBase instance for both school sites. Keep the existing shared PocketHost instance at `https://clc-schools.pockethost.io`.
 
 | Frontend | Build target / school slug | Backend |
 | --- | --- | --- |
@@ -95,3 +95,14 @@ Test the backend locally first; a shared backend update affects both schools imm
 Rollback only with compatible code/schema; for this isolation upgrade restore a full tested backup with its matching old hooks/frontends if necessary. Restoring a shared backup restores both schools and loses writes since that backup. Do not reverse the isolation migration or rerun historical migrations. Never deploy the sample seed scripts into the old Coderick database.
 
 Rollback only with compatible code/schema; for this isolation upgrade restore a full tested backup with its matching old hooks/frontends if necessary. Restoring a shared backup restores both schools and loses writes since that backup. Do not reverse the isolation migration or rerun historical migrations. Never deploy the sample seed scripts into the old Coderick database.
+
+
+## Public sample demo (v1.3.0)
+
+The common backend must be installed before publishing the new frontend. Pushes with backend changes deliberately pause frontend deployment. Download the `PocketHost-Schools-RELEASE.zip` workflow artifact, extract it, and upload its `pb_hooks` and `pb_migrations` folders to the **clc-schools** instance using the existing SFTP setup. Back up the database first, keep `pb_data` untouched, then restart clc-schools so the new migration runs. Verify both public demo logins and CHS access before running the workflow manually to publish the matching frontends.
+
+Public demo credentials are intentionally public, restricted to sample-school reads by API rules and request hooks. Sample forms remain interactive but submission shows a browser alert. Existing sample students, teachers, and parents are renamed; sample parent email addresses become fictional, so their previous login emails change. Existing administrator login emails remain usable and are masked for demo visitors. Sample order/record IDs and relationships are retained, with one sample family assigned to the new demo parent. CHS records are left untouched. Anonymous guest menus expose only active menu items for the selected school.
+
+`frontend/src/lib/site.ts` contains `CHS_PARENT_LOGIN_VISIBLE`; change it to true and deploy when CHS Parent Login should appear on the landing page. This controls visibility, not existing parent-account authorization.
+
+Run `npm test`, TypeScript checks, and `npm run test:demo` with PocketBase 0.28.4 before deployment. The older shared-school integration suite tests its original migration in isolation; the demo integration suite separately checks the new migration and protected public accounts.

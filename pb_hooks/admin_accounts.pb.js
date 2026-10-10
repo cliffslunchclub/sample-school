@@ -1,5 +1,7 @@
 // Create admins only through an authenticated school admin. Never accept role/school from the client.
 routerAdd("POST", "/api/admin/accounts", (e) => {
+  require(__hooks+"/demo-access.js").guard(e)
+
   if (!e.auth || e.auth.getString("role") !== "admin" || !e.auth.getBool("active")) {
     return e.json(403, {message: "An active administrator account is required."})
   }
@@ -46,3 +48,4 @@ routerAdd("GET", "/api/school-calendar", (e) => {
     return e.json(200, {id:settings.id, semester_start:settings.getString("semester_start"), semester_end:settings.getString("semester_end"), ordering_days:settings.getStringSlice("ordering_days")})
   } catch (err) {return e.json(404, {message:"School calendar not found."})}
 })
+

@@ -78,6 +78,7 @@ jobs:
 
           (cd ".deploy/sample/$release_id/siteground" && zip -q -r "$GITHUB_WORKSPACE/Sample-School-$release_id.zip" .)
           (cd ".deploy/chs/$release_id/siteground" && zip -q -r "$GITHUB_WORKSPACE/Cherry-Hill-$release_id.zip" .)
+          (cd ".deploy/sample/$release_id/pockethost" && zip -q -r "$GITHUB_WORKSPACE/PocketHost-Schools-$release_id.zip" pb_hooks pb_migrations)
 
       - name: Save versioned ZIPs to this workflow run
         uses: actions/upload-artifact@v4
@@ -86,6 +87,7 @@ jobs:
           path: |
             Sample-School-${{ steps.release.outputs.id }}.zip
             Cherry-Hill-${{ steps.release.outputs.id }}.zip
+            PocketHost-Schools-${{ steps.release.outputs.id }}.zip
           if-no-files-found: error
           retention-days: 90
 
@@ -164,3 +166,4 @@ jobs:
           security: strict
           local-dir: siteground/
           server-dir: ${{ vars.CHS_SG_FTP_DIR }}
+
