@@ -106,3 +106,9 @@ Public demo credentials are intentionally public, restricted to sample-school re
 `frontend/src/lib/site.ts` contains `CHS_PARENT_LOGIN_VISIBLE`; change it to true and deploy when CHS Parent Login should appear on the landing page. This controls visibility, not existing parent-account authorization.
 
 Run `npm test`, TypeScript checks, and `npm run test:demo` with PocketBase 0.28.4 before deployment. The older shared-school integration suite tests its original migration in isolation; the demo integration suite separately checks the new migration and protected public accounts.
+
+## Automated shared PocketHost upload
+
+The workflow now uploads the shared backend to `/clc-schools/` before either frontend. Add repository secrets `POCKETHOST_SSH_KEY` and `POCKETHOST_KNOWN_HOSTS` (the existing trusted `[ftp.pockethost.io]:2222` entry from your local known_hosts file). If the private key is encrypted, also add `POCKETHOST_SSH_PASSPHRASE`. The known account email is used unless `POCKETHOST_USER` overrides it. No database files are uploaded or removed.
+
+Take a full PocketBase backup before the first demo migration. New migrations still require restarting **clc-schools** in PocketHost. The workflow verifies the release, demo-account login, and guest-menu reads before publishing either frontend; it retries for several minutes and leaves frontend jobs blocked if the restart has not happened. After restarting, rerun failed jobs. Do not run a previous pre-automation workflow manually to bypass this gate.

@@ -25,7 +25,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       release_id: ${{ steps.release.outputs.id }}
-      deploy_safe: ${{ steps.source_type.outputs.deploy_safe }}
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -38,21 +37,6 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-
-      - name: Check for backend changes that need a separate PocketBase upload
-        id: source_type
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          EVENT_BEFORE: ${{ github.event.before }}
-        run: |
-          if [[ "$EVENT_NAME" != "push" || -z "$EVENT_BEFORE" || "$EVENT_BEFORE" =~ ^0+$ ]]; then
-            echo "deploy_safe=true" >> "$GITHUB_OUTPUT"
-          elif git diff --name-only "$EVENT_BEFORE" "$GITHUB_SHA" | grep -Eq '^(pb_hooks|pb_migrations)/'; then
-            echo "deploy_safe=false" >> "$GITHUB_OUTPUT"
-            echo "PocketBase hooks or migrations changed. Frontend ZIPs will be built, but live uploads are skipped until the backend update is handled separately."
-          else
-            echo "deploy_safe=true" >> "$GITHUB_OUTPUT"
-          fi
 
       - name: Install frontend dependencies
         run: npm ci --prefix frontend
@@ -91,10 +75,77 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
+  deploy-backend:
+    name: Upload and verify shared PocketHost backend
+    needs: package
+    if: ${{ vars.ENABLE_SITEGROUND_DEPLOY == 'true' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Check out verification script
+        uses: actions/checkout@v4
+
+      - name: Download release package
+        uses: actions/download-artifact@v4
+        with:
+          name: siteground-${{ github.sha }}
+          path: packages
+
+      - name: Unpack backend code
+        run: unzip -q "packages/PocketHost-Schools-${{ needs.package.outputs.release_id }}.zip" -d backend
+
+      - name: Configure PocketHost SSH
+        env:
+          PH_KEY: ${{ secrets.POCKETHOST_SSH_KEY }}
+          PH_PASSPHRASE: ${{ secrets.POCKETHOST_SSH_PASSPHRASE }}
+          HOST_KEYS: ${{ secrets.POCKETHOST_KNOWN_HOSTS }}
+        run: |
+          test -n "$PH_KEY" || { echo "Add POCKETHOST_SSH_KEY to GitHub secrets."; exit 1; }
+          test -n "$HOST_KEYS" || { echo "Add POCKETHOST_KNOWN_HOSTS using the trusted host entry from your Mac."; exit 1; }
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$PH_KEY" | tr -d '\r' > ~/.ssh/pockethost
+          printf '%s\n' "$HOST_KEYS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/pockethost ~/.ssh/known_hosts
+          ssh-keygen -F '[ftp.pockethost.io]:2222' -f ~/.ssh/known_hosts > /dev/null || { echo "The trusted PocketHost entry for port 2222 is missing."; exit 1; }
+          eval "$(ssh-agent -s)"
+          printf '%s\n' "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+          cat > "$RUNNER_TEMP/ssh-askpass" <<'SH'
+          #!/bin/sh
+          printf '%s\n' "$KEY_PASSPHRASE"
+          SH
+          chmod 700 "$RUNNER_TEMP/ssh-askpass"
+          export SSH_ASKPASS="$RUNNER_TEMP/ssh-askpass" SSH_ASKPASS_REQUIRE=force DISPLAY=:0
+          KEY_PASSPHRASE="$PH_PASSPHRASE" ssh-add ~/.ssh/pockethost < /dev/null
+          rm "$RUNNER_TEMP/ssh-askpass"
+
+      - name: Upload only backend code to clc-schools
+        env:
+          PH_USER: ${{ secrets.POCKETHOST_USER || 'cliffscafe41@gmail.com' }}
+        run: |
+          python3 - <<'PYCODE'
+          from pathlib import Path
+          hooks=Path('backend/pb_hooks')
+          # Helpers first, then request hooks, migrations, and the release hook.
+          files=sorted(p for p in hooks.glob('*.js') if not p.name.endswith('.pb.js'))
+          files+=sorted(p for p in hooks.glob('*.pb.js') if p.name!='release.pb.js')
+          files+=sorted(Path('backend/pb_migrations').glob('*.js'))
+          files+=[hooks/'release.pb.js']
+          with open('backend.sftp','w') as batch:
+              for item in files:
+                  batch.write(f'put "{item}" "/clc-schools/{item.parent.name}/{item.name}"\n')
+          PYCODE
+          sftp -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -i ~/.ssh/pockethost -P 2222 -b backend.sftp "$PH_USER@ftp.pockethost.io"
+
+      - name: Verify backend release and demo migration before publishing frontends
+        env:
+          EXPECTED_RELEASE: ${{ needs.package.outputs.release_id }}
+        run: python3 scripts/verify-hosted-demo.py
+
   deploy-sample:
     name: Deploy Sample School
-    needs: package
-    if: ${{ vars.ENABLE_SITEGROUND_DEPLOY == 'true' && needs.package.outputs.deploy_safe == 'true' }}
+    needs: [package, deploy-backend]
+    if: ${{ vars.ENABLE_SITEGROUND_DEPLOY == 'true' }}
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -131,8 +182,8 @@ jobs:
 
   deploy-chs:
     name: Deploy Cherry Hill
-    needs: package
-    if: ${{ vars.ENABLE_SITEGROUND_DEPLOY == 'true' && needs.package.outputs.deploy_safe == 'true' }}
+    needs: [package, deploy-backend]
+    if: ${{ vars.ENABLE_SITEGROUND_DEPLOY == 'true' }}
     runs-on: ubuntu-latest
     environment: production
     steps:
