@@ -168,6 +168,20 @@ jobs:
           test -n "$FTP_SERVER" && test -n "$FTP_USERNAME" && test -n "$FTP_PASSWORD" && test -n "$FTP_DIR"
           [[ "$FTP_DIR" == */ ]] || { echo "Sample remote directory must end with /"; exit 1; }
 
+      - name: Check out deployment diagnostics
+        uses: actions/checkout@v4
+
+      - name: Resolve verified school document root
+        id: destination
+        env:
+          FTP_SERVER: ${{ secrets.SAMPLE_SG_FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.SAMPLE_SG_FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.SAMPLE_SG_FTP_PASSWORD }}
+          FTP_DIR: ${{ vars.SAMPLE_SG_FTP_DIR }}
+          FTP_PORT: ${{ vars.SITEGROUND_FTP_PORT || '21' }}
+          SCHOOL_SLUG: sample
+        run: python3 scripts/siteground-destination.py
+
       - name: Upload to SiteGround over FTPS
         uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
@@ -178,7 +192,7 @@ jobs:
           port: ${{ vars.SITEGROUND_FTP_PORT || '21' }}
           security: strict
           local-dir: siteground/
-          server-dir: ${{ vars.SAMPLE_SG_FTP_DIR }}
+          server-dir: ${{ steps.destination.outputs.dir }}
 
   deploy-chs:
     name: Deploy Cherry Hill
@@ -206,6 +220,20 @@ jobs:
           test -n "$FTP_SERVER" && test -n "$FTP_USERNAME" && test -n "$FTP_PASSWORD" && test -n "$FTP_DIR"
           [[ "$FTP_DIR" == */ ]] || { echo "CHS remote directory must end with /"; exit 1; }
 
+      - name: Check out deployment diagnostics
+        uses: actions/checkout@v4
+
+      - name: Resolve verified school document root
+        id: destination
+        env:
+          FTP_SERVER: ${{ secrets.CHS_SG_FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.CHS_SG_FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.CHS_SG_FTP_PASSWORD }}
+          FTP_DIR: ${{ vars.CHS_SG_FTP_DIR }}
+          FTP_PORT: ${{ vars.SITEGROUND_FTP_PORT || '21' }}
+          SCHOOL_SLUG: chs
+        run: python3 scripts/siteground-destination.py
+
       - name: Upload to SiteGround over FTPS
         uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
@@ -216,5 +244,5 @@ jobs:
           port: ${{ vars.SITEGROUND_FTP_PORT || '21' }}
           security: strict
           local-dir: siteground/
-          server-dir: ${{ vars.CHS_SG_FTP_DIR }}
+          server-dir: ${{ steps.destination.outputs.dir }}
 
