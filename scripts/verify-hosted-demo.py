@@ -2,7 +2,7 @@
 import json, os, time, urllib.request, urllib.error
 BASE='https://clc-schools.pockethost.io'
 def request(path,body=None,slug='sample',token=''):
-    q=urllib.request.Request(BASE+path,data=json.dumps(body).encode() if body is not None else None,headers={'Content-Type':'application/json','X-School-Slug':slug,'Authorization':token})
+    q=urllib.request.Request(BASE+path,data=json.dumps(body).encode() if body is not None else None,headers={'User-Agent':'Mozilla/5.0 (compatible; CliffsLunchClubDeploy/1.0; +https://cliffslunchclub.com)','Content-Type':'application/json','X-School-Slug':slug,'Authorization':token})
     try:
         with urllib.request.urlopen(q,timeout=15) as response:return json.loads(response.read() or b'{}')
     except urllib.error.HTTPError as error:
