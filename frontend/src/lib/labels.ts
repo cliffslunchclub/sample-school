@@ -1,4 +1,5 @@
 import type { MealSelection, MenuItem, DeliveryTime } from "./types";
+import { weekdayOf, type Weekday } from "./semester";
 
 export interface LabelLine { text: string; bold?: boolean; right?: boolean }
 export interface LunchLabel { lines: LabelLine[]; kind: "student" }
@@ -9,7 +10,18 @@ export function timeValue(label: string): number {
   let hour = Number(m[1]); if (m[3]) hour = hour % 12 + (m[3].toLowerCase() === "pm" ? 12 : 0);
   return hour * 60 + Number(m[2] || 0);
 }
-const displayDate = (key: string) => new Intl.DateTimeFormat("en-US", {weekday:"short",month:"short",day:"numeric",year:"numeric",timeZone:"UTC"}).format(new Date(key + "T12:00:00Z"));
+const displayDay = (key: string) => weekdayOf(key);
+
+/** Pick the newest complete dated order set for a weekday. */
+export function latestWeekdayTemplate(orders: MealSelection[], weekday: Weekday): { key: string | null; orders: MealSelection[] } {
+  const matching = orders.filter(order => order.lunch_date && weekdayOf(order.lunch_date) === weekday);
+  const key = matching.reduce<string | null>((latest, order) => {
+    const candidate = order.lunch_date.slice(0, 10);
+    return !latest || candidate > latest ? candidate : latest;
+  }, null);
+  return { key, orders: key ? matching.filter(order => order.lunch_date.slice(0, 10) === key) : [] };
+}
+
 export function buildLabels(orders: MealSelection[], menu: MenuItem[], times: DeliveryTime[], key: string): LabelSheet {
   const slots: (LunchLabel | null)[] = [];
   const menuMap = new Map(menu.map(m => [m.id, m.name]));
@@ -30,7 +42,7 @@ export function buildLabels(orders: MealSelection[], menu: MenuItem[], times: De
       {text:student?.name || "Unknown student",bold:true},
       {text:name},
       {text:staff ? `FACULTY/STAFF ${time}` : [grade,teacher].filter(Boolean).join(" - ")},
-      {text:staff ? displayDate(key) : `${displayDate(key)} - ${time}`},
+      {text:staff ? displayDay(key) : `${displayDay(key)} - ${time}`},
     ]});
   }
   const studentCount = rows.length;
