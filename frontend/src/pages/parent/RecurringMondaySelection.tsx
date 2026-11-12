@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ClipboardList } from "lucide-react";
 import pb from "../../lib/pocketbase";
 import { useAuth } from "../../lib/auth";
 import { useSemester } from "../../lib/SemesterContext";
@@ -81,7 +82,7 @@ export default function RecurringMondaySelection() {
       action={open ? <Button onClick={save} loading={saving}>Save Monday Selections</Button> : undefined}/>
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     {!open && <Card className="p-4 text-sm text-ink-soft">Ordering changes are closed. You can review your Monday meals now; editing reopens on {orderingDayText(orderingDays)}.</Card>}
-    {students.length===0 ? <EmptyState title="No students" desc="Add a student before selecting a Monday meal."/> : students.map(s=>
+    {students.length===0 ? <EmptyState icon={<ClipboardList className="h-7 w-7"/>} title="No students" desc="Add a student before selecting a Monday meal."/> : students.map(s=>
       <Card key={s.id} className="p-5">
         <div className="mb-2 font-extrabold">{s.name}</div>
         <p className="mb-3 text-xs text-ink-soft">{s.expand?.grade?.name} — {s.expand?.teacher?.name}</p>
