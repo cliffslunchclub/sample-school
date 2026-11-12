@@ -4,6 +4,7 @@ import pb from "../../lib/pocketbase";
 import { Card, Button, Input, Field, Spinner, useToast } from "../../components/ui";
 import { PageHeader } from "../../components/PageHeader";
 import { useSemester } from "../../lib/SemesterContext";
+import { isSampleSite } from "../../lib/site";
 import { ORDERING_DAYS, DEFAULT_ORDERING_DAYS, orderingDayText, type OrderingDay } from "../../lib/semester";
 import { BatchWriteError, sendBatchRequests, type BatchProgress, type BatchRequest } from "../../lib/pocketbaseBatch";
 import type { Settings as SettingsType } from "../../lib/types";
@@ -220,7 +221,7 @@ export default function Settings() {
         </form>
       </Card>
 
-      <Card className="mb-5 p-5">
+      {isSampleSite && <Card className="mb-5 p-5">
         <div className="mb-4 flex items-center gap-2 font-extrabold text-ink">
           <CalendarDays className="h-5 w-5 text-leaf-600" /> Semester dates
         </div>
@@ -249,13 +250,14 @@ export default function Settings() {
           </div>
           <Button type="submit" loading={savingSem}>Save dates</Button>
         </form>
-      </Card>
+      </Card>}
+      {!isSampleSite && <Card className="mb-5 p-5"><p className="font-extrabold text-ink">Monday-only recurring lunch</p><p className="mt-2 text-sm text-ink-soft">CHS Monday selections repeat every week until changed. Semester dates are not required. Ordering days below control when parents may change meals, not which day lunches are served.</p></Card>}
 
       <Card className="mb-5 p-5">
         <div className="mb-2 flex items-center gap-2 font-extrabold text-ink">
           <CalendarRange className="h-5 w-5 text-leaf-600" /> Meal selection days
         </div>
-        <p className="mb-4 text-sm text-ink-soft">Choose when parents may place or change meals for the following week. Each selected day runs from 12:00 AM to 11:59 PM, Eastern time. Lunch service remains Monday through Friday. Administrators can edit orders at any time.</p>
+        <p className="mb-4 text-sm text-ink-soft">Choose when parents may place or change meals for the following week. Each selected day runs from 12:00 AM to 11:59 PM, Eastern time. Lunch service is {isSampleSite ? "Monday through Friday" : "Monday only"}. Administrators can edit orders at any time.</p>
         <form onSubmit={saveOrderingDays} className="space-y-4">
           <div className="flex flex-wrap gap-4">
             {ORDERING_DAYS.map(day => <label key={day} className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={orderingDays.includes(day)} onChange={() => setOrderingDays(days => days.includes(day) ? days.filter(d => d !== day) : [...days, day])} />{day}</label>)}
