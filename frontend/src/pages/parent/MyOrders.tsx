@@ -4,13 +4,15 @@ import pb from "../../lib/pocketbase";
 import { useAuth } from "../../lib/auth";
 import { Card, EmptyState, Spinner, Badge } from "../../components/ui";
 import { PageHeader } from "../../components/PageHeader";
-import { weekdayOf, isKeyEditable, keyOf } from "../../lib/semester";
+import { weekdayOf, isKeyEditable, keyOf, orderingWindow } from "../../lib/semester";
+import { isSampleSite } from "../../lib/site";
 import type { MealSelection as Sel } from "../../lib/types";
 
 import { useSemester } from "../../lib/SemesterContext";
 
 export default function MyOrders() {
   const { orderingDays } = useSemester();
+  const recurring = !isSampleSite;
   const { user } = useAuth();
   const [orders, setOrders] = useState<Sel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -18,7 +20,7 @@ export default function MyOrders() {
   useEffect(() => {
     (async () => {
       const res = await pb.collection("meal_selections").getFullList<Sel>({
-        filter: `parent = "${user!.id}"`,
+        filter: recurring ? `parent = "${user!.id}" && recurring_weekday = "Monday"` : `parent = "${user!.id}"`,
         expand: "student,student.grade,student.teacher,menu_item,delivery_time",
         sort: "-lunch_date",
         requestKey: null,
@@ -32,7 +34,7 @@ export default function MyOrders() {
   const grouped = useMemo(() => {
     const map = new Map<string, { key: string; items: Sel[] }>();
     orders.forEach((o) => {
-      const k = keyOf(o.lunch_date);
+      const k = recurring ? "Monday" : keyOf(o.lunch_date);
       const entry = map.get(k) ?? { key: k, items: [] };
       entry.items.push(o);
       map.set(k, entry);
@@ -50,13 +52,13 @@ export default function MyOrders() {
       if (wa !== wb) return wb.localeCompare(wa); // newer week first
       return a.key.localeCompare(b.key);           // Mon before Wed
     });
-  }, [orders]);
+  }, [orders, recurring]);
 
   if (loading) return <Spinner label="Loading your orders…" />;
 
   return (
     <div>
-      <PageHeader title="My Orders" desc="Every meal you've selected, saved for your records" />
+      <PageHeader title="My Orders" desc={recurring ? "Your Monday lunches repeat each week" : "Every meal you've selected, saved for your records"} />
       {orders.length === 0 ? (
         <EmptyState
           icon={<ClipboardList className="h-7 w-7" />}
@@ -66,13 +68,13 @@ export default function MyOrders() {
       ) : (
         <div className="space-y-5">
           {grouped.map(({ key, items }) => {
-            const editable = isKeyEditable(key, new Date(), orderingDays);
+            const editable = recurring ? orderingWindow(new Date(), orderingDays).open : isKeyEditable(key, new Date(), orderingDays);
             return (
               <Card key={key} className="overflow-hidden">
                 <div className="flex items-center justify-between border-b border-line bg-cream/60 px-5 py-3">
                   <div className="flex items-center gap-2 font-extrabold text-ink">
                      <CalendarDays className="h-5 w-5 text-leaf-600" />
-                     {weekdayOf(items[0].lunch_date)}
+                     {recurring ? "Monday · every week" : weekdayOf(items[0].lunch_date)}
                    </div>
                   <Badge tone={editable ? "green" : "neutral"}>{editable ? "Editable" : "Locked"}</Badge>
                 </div>
