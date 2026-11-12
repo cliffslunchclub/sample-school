@@ -133,10 +133,11 @@ export function folderLabelsHtml(folders: FolderLabel[]): string {
   for (let pageStart = 0; pageStart < folders.length; pageStart += 15) {
     const page = folders.slice(pageStart, pageStart + 15);
     const cells: string[] = [];
-    for (let col = 0; col < 3; col++) {
-      for (let pair = 0; pair < 5; pair++) {
-        const folder = page[col * 5 + pair];
-        for (let copy = 0; copy < 2; copy++) cells.push(folder ? labelHtml(folder) : '<div class="sticker empty"></div>');
+    // CSS grid flows row first; calculate the folder index in column pairs.
+    for (let row = 0; row < 10; row++) {
+      for (let col = 0; col < 3; col++) {
+        const folder = page[col * 5 + Math.floor(row / 2)];
+        cells.push(folder ? labelHtml(folder) : '<div class="sticker empty"></div>');
       }
     }
     pages.push(`<section class="sheet">${cells.join("")}</section>`);
