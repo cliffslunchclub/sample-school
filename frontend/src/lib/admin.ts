@@ -1,5 +1,5 @@
 import pb from "./pocketbase";
-import { dayFilter, isoForKey } from "./semester";
+import { dayFilter, isoForKey, type Weekday } from "./semester";
 import type { DeliveryRule, Student } from "./types";
 
 export function deriveDeliveryTime(student: Student, rules: DeliveryRule[]): string {
@@ -16,6 +16,8 @@ export function deriveDeliveryTime(student: Student, rules: DeliveryRule[]): str
 export async function adminSetMeal(opts: {
   student: Student;
   lunchKey: string;
+  recurringWeekday?: Weekday;
+  existingId?: string;
   newMenuItem: string;
   deliveryTimeId?: string;
   reason: string;
@@ -24,13 +26,17 @@ export async function adminSetMeal(opts: {
   rules: DeliveryRule[];
 }) {
   const { student, lunchKey, newMenuItem, reason, adminId, schoolId, rules } = opts;
-  const lunchIso = isoForKey(lunchKey);
+  const lunchIso = opts.recurringWeekday ? "" : isoForKey(lunchKey);
 
   let existing = null;
   try {
-    existing = await pb
-      .collection("meal_selections")
-      .getFirstListItem(`student = "${student.id}" && ${dayFilter("lunch_date", lunchKey)}`, { requestKey: null });
+    existing = opts.existingId
+      ? await pb.collection("meal_selections").getOne(opts.existingId, { requestKey: null })
+      : await pb.collection("meal_selections").getFirstListItem(
+        opts.recurringWeekday
+          ? `student = "${student.id}" && recurring_weekday = "${opts.recurringWeekday}"`
+          : `student = "${student.id}" && ${dayFilter("lunch_date", lunchKey)}`,
+        { requestKey: null });
   } catch {
     existing = null;
   }
@@ -41,6 +47,7 @@ export async function adminSetMeal(opts: {
   const payload = {
     student: student.id,
     lunch_date: lunchIso,
+    recurring_weekday: opts.recurringWeekday || "",
     menu_item: newMenuItem,
     delivery_time: deliveryTime,
     parent: student.parent || null,
@@ -56,6 +63,7 @@ export async function adminSetMeal(opts: {
   await pb.collection("audit_log").create({
     student: student.id,
     lunch_date: lunchIso,
+    recurring_weekday: opts.recurringWeekday || "",
     previous_meal: previousMeal || null,
     new_meal: newMenuItem,
     admin: adminId,
