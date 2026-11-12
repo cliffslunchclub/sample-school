@@ -129,7 +129,7 @@ export default function Summary() {
         </div>
       </Card>}
       {legacyFallback && <p className="mb-4 text-sm text-amber-700">Showing the latest dated Monday import. These orders have not yet been converted to recurring selections.</p>}
-      {error && <p role="alert" className="mb-4 text-sm text-red-700">{error}</p>
+      {error && <p role="alert" className="mb-4 text-sm text-red-700">{error}</p>}
 
       {fetching ? (
         <Spinner label="Calculating…" />
