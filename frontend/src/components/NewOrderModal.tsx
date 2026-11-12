@@ -4,6 +4,7 @@ import { adminSetMeal, deriveDeliveryTime } from "../lib/admin";
 import { isoForKey, dayFilter, type LunchDate } from "../lib/semester";
 import { useAuth } from "../lib/auth";
 import pb from "../lib/pocketbase";
+import { isSampleSite } from "../lib/site";
 import type { Student, MenuItem, DeliveryTime, DeliveryRule, MealSelection } from "../lib/types";
 
 export function NewOrderModal({
@@ -27,9 +28,10 @@ export function NewOrderModal({
 }) {
   const { user } = useAuth();
   const toast = useToast();
+  const recurring = !isSampleSite;
 
   const [studentId, setStudentId] = useState("");
-  const [lunchKey, setLunchKey] = useState("");
+  const [lunchKey, setLunchKey] = useState(recurring ? "__recurring_monday__" : "");
   const [menuItem, setMenuItem] = useState("");
   const [deliveryTimeId, setDeliveryTimeId] = useState("");
   const [reason, setReason] = useState("");
@@ -42,7 +44,7 @@ export function NewOrderModal({
   // Reset state when modal opens
   useEffect(() => {
     if (open) {
-      setStudentId(""); setLunchKey(""); setMenuItem("");
+      setStudentId(""); setLunchKey(recurring ? "__recurring_monday__" : ""); setMenuItem("");
       setDeliveryTimeId(""); setReason(""); setMode("add"); setConflict(null);
     }
   }, [open]);
@@ -58,13 +60,13 @@ export function NewOrderModal({
     let cancelled = false;
     pb.collection("meal_selections")
       .getFirstListItem<MealSelection>(
-        `student = "${studentId}" && ${dayFilter("lunch_date", lunchKey)}`,
+        recurring ? `student = "${studentId}" && recurring_weekday = "Monday"` : `student = "${studentId}" && ${dayFilter("lunch_date", lunchKey)}`,
         { requestKey: null }
       )
       .then((sel) => { if (!cancelled) setConflict(sel); })
       .catch(() => { if (!cancelled) setConflict(null); });
     return () => { cancelled = true; };
-  }, [studentId, lunchKey]);
+  }, [studentId, lunchKey, recurring]);
 
   const conflictMealName = conflict
     ? (menuItems.find((m) => m.id === conflict.menu_item)?.name ?? "existing meal")
@@ -82,7 +84,7 @@ export function NewOrderModal({
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!student || !lunchKey || !menuItem) {
-      toast("Select a student, date and meal", "error");
+      toast("Select a student, day and meal", "error");
       return;
     }
     setSaving(true);
@@ -91,7 +93,8 @@ export function NewOrderModal({
         // Create alongside the existing record (second lunch same day)
         await pb.collection("meal_selections").create({
           student: student.id,
-          lunch_date: isoForKey(lunchKey),
+          lunch_date: recurring ? "" : isoForKey(lunchKey),
+          recurring_weekday: recurring ? "Monday" : "",
           menu_item: menuItem,
           delivery_time: deliveryTimeId || deriveDeliveryTime(student, rules) || null,
           parent: student.parent || null,
@@ -99,7 +102,8 @@ export function NewOrderModal({
         });
         await pb.collection("audit_log").create({
           student: student.id,
-          lunch_date: isoForKey(lunchKey),
+          lunch_date: recurring ? "" : isoForKey(lunchKey),
+          recurring_weekday: recurring ? "Monday" : "",
           previous_meal: conflict.menu_item || null,
           new_meal: menuItem,
           admin: user!.id,
@@ -112,6 +116,7 @@ export function NewOrderModal({
         await adminSetMeal({
           student,
           lunchKey,
+          recurringWeekday: recurring ? "Monday" : undefined,
           newMenuItem: menuItem,
           deliveryTimeId,
           reason,
@@ -147,17 +152,17 @@ export function NewOrderModal({
         </Field>
 
         <Field label="Day" required>
-          <Select value={lunchKey} onChange={(e) => setLunchKey(e.target.value)} required>
+          {recurring ? <div className="flex h-11 items-center rounded-xl border border-line bg-cream-deep px-4 text-sm font-bold">Monday · repeats every week</div> : <Select value={lunchKey} onChange={(e) => setLunchKey(e.target.value)} required>
             <option value="">Select day…</option>
             {upcomingDates.map(d => <option key={d.key} value={d.key}>{d.weekday} · {d.key}</option>)}
-          </Select>
+          </Select>}
         </Field>
 
         {/* Conflict resolution — only shown when an order already exists */}
         {conflict && (
           <div className="rounded-xl border border-sun-300 bg-sun-50/70 p-3.5">
             <p className="mb-2.5 text-sm text-[oklch(0.45_0.12_65)]">
-              This student already has <strong>{conflictMealName}</strong> on this date.
+              This student already has <strong>{conflictMealName}</strong> on this {recurring ? "weekday" : "date"}.
             </p>
             <div className="flex gap-2">
               <button

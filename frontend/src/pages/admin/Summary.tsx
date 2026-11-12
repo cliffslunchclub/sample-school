@@ -4,28 +4,25 @@ import { Sigma, Printer, Download } from "lucide-react";
 import pb from "../../lib/pocketbase";
 import { Card, Select, Spinner, EmptyState } from "../../components/ui";
 import { PageHeader } from "../../components/PageHeader";
-import { lunchDates, dayFilter } from "../../lib/semester";
+import { weekdayOf } from "../../lib/semester";
+import { isSampleSite } from "../../lib/site";
 import { useSemester } from "../../lib/SemesterContext";
 import { toCsv, downloadFile } from "../../lib/csv";
 import type { MealSelection as Sel, DeliveryTime } from "../../lib/types";
 
 
 
-/** OR-combines dayFilters for every occurrence of a given weekday in the semester. */
-function weekdayFilter(field: string, weekday: Weekday, days: ReturnType<typeof lunchDates>): string {
-  const keys = days.filter((d) => d.weekday === weekday).map((d) => d.key);
-  if (!keys.length) return "id = ''"; // no match
-  return keys.map((k) => `(${dayFilter(field, k)})`).join(" || ");
-}
 
 export default function Summary() {
   const { start, end } = useSemester();
-  const days = useMemo(() => lunchDates(start, end), [start, end]);
+  const recurring = !isSampleSite;
   const [times, setTimes] = useState<DeliveryTime[]>([]);
   const [weekday, setWeekday] = useState<Weekday>("Monday");
   const [orders, setOrders] = useState<Sel[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetching, setFetching] = useState(false);
+  const [error, setError] = useState("");
+  const [legacyFallback, setLegacyFallback] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -36,18 +33,46 @@ export default function Summary() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       setFetching(true);
-      const filter = weekdayFilter("lunch_date", weekday, days);
-      const res = await pb.collection("meal_selections").getFullList<Sel>({
-        filter,
-        expand: "menu_item,delivery_time",
-        requestKey: null,
-      });
-      setOrders(res);
-      setFetching(false);
+      setError("");
+      try {
+        // CHS recurring rows are indexed by weekday. Never build a giant OR
+        // expression containing every calendar date in a semester.
+        let recurringRows: Sel[] = [];
+        if (recurring) {
+          recurringRows = await pb.collection("meal_selections").getFullList<Sel>({
+            filter: 'recurring_weekday = "Monday"',
+            expand: "menu_item,delivery_time",
+            requestKey: null,
+          });
+        }
+        let selected = recurringRows;
+        let fallback = false;
+        if (!recurring || selected.length === 0) {
+          // Compatibility for existing CHS imports awaiting migration, and
+          // the sample school's historical date-based orders.
+          const dated = await pb.collection("meal_selections").getFullList<Sel>({
+            filter: `lunch_date >= "${start} 00:00:00.000Z" && lunch_date <= "${end} 23:59:59.999Z"`,
+            expand: "menu_item,delivery_time",
+            sort: "-lunch_date",
+            requestKey: null,
+          });
+          const matches = dated.filter(o => o.lunch_date && weekdayOf(o.lunch_date.slice(0, 10)) === weekday);
+          const newest = matches[0]?.lunch_date.slice(0, 10);
+          selected = newest ? matches.filter(o => o.lunch_date.slice(0, 10) === newest) : [];
+          fallback = recurring && selected.length > 0;
+        }
+        if (!cancelled) { setOrders(selected); setLegacyFallback(fallback); }
+      } catch {
+        if (!cancelled) { setOrders([]); setError("Could not calculate meal totals. Please retry."); }
+      } finally {
+        if (!cancelled) setFetching(false);
+      }
     })();
-  }, [weekday, days]);
+    return () => { cancelled = true; };
+  }, [weekday, start, end, recurring]);
 
   const { rows, colTotals, grand } = useMemo(() => {
     const timeIds = times.map((t) => t.id);
@@ -96,18 +121,20 @@ export default function Summary() {
         }
       />
 
-      <Card className="mb-4 p-4">
+      {!recurring && <Card className="mb-4 p-4">
         <div className="max-w-xs">
           <Select value={weekday} onChange={(e) => setWeekday(e.target.value as Weekday)}>
             {WEEKDAYS.map(day => <option key={day} value={day}>{day}</option>)}
           </Select>
         </div>
-      </Card>
+      </Card>}
+      {legacyFallback && <p className="mb-4 text-sm text-amber-700">Showing the latest dated Monday import. These orders have not yet been converted to recurring selections.</p>}
+      {error && <p role="alert" className="mb-4 text-sm text-red-700">{error}</p>}
 
       {fetching ? (
         <Spinner label="Calculating…" />
       ) : rows.length === 0 ? (
-        <EmptyState icon={<Sigma className="h-7 w-7" />} title={`No orders for ${weekday}`} desc={`Nothing has been ordered for any ${weekday} this semester.`} />
+        <EmptyState icon={<Sigma className="h-7 w-7" />} title={`No orders for ${weekday}`} desc={recurring ? "No recurring Monday orders yet. Import the new Monday roster." : `No orders for ${weekday} in this semester.`} />
       ) : (
         <Card className="overflow-hidden">
           <div className="overflow-x-auto thin-scroll">

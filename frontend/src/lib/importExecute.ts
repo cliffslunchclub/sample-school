@@ -32,6 +32,7 @@ export async function executeCombined(
   ctx: Ctx,
   extraKeys: Partial<Record<"tuesday" | "thursday" | "friday", string>> = {},
 ): Promise<ExecResult> {
+  const recurring = mondayKey === "__recurring_monday__";
   const dateByDay: Record<string, string> = {
     monday: mondayKey,
     tuesday: extraKeys.tuesday || "",
@@ -68,6 +69,7 @@ export async function executeCombined(
   ref.selections.forEach((selection) => {
     const date = selection.lunch_date?.slice(0, 10);
     if (date) selectionByKey.set(`${selection.student}|${date}`, selection);
+    if (selection.recurring_weekday === "Monday") selectionByKey.set(`${selection.student}|__recurring_monday__|${selection.menu_item}|${selection.delivery_time || ""}`, selection);
   });
   const ruleByTeacher = new Map<string, string>();
   const ruleByGrade = new Map<string, string>();
@@ -197,12 +199,15 @@ export async function executeCombined(
       const menu = (menuId && menuById.get(menuId)) || menuByNorm.get(norm(rawMeal || ""));
       if (!menu) continue;
 
-      const existing = selectionByKey.get(`${student.id}|${date}`);
+      const existing = recurring
+        ? selectionByKey.get(`${student.id}|__recurring_monday__|${menu.id}|${deliveryId || ""}`)
+        : selectionByKey.get(`${student.id}|${date}`);
       const resolutionKey = `${field}Resolution` as keyof AnalyzedRow;
       const resolution = (row[resolutionKey] as "keep" | "replace" | "add" | undefined) || "keep";
       const body = {
         student: student.id, delivery_time: deliveryId, parent: student.parent || null,
-        school: ctx.schoolId, lunch_date: `${date}T12:00:00.000Z`, menu_item: menu.id,
+        school: ctx.schoolId, lunch_date: recurring ? "" : `${date}T12:00:00.000Z`,
+        recurring_weekday: recurring ? "Monday" : "", menu_item: menu.id,
       };
 
       if (existing) {

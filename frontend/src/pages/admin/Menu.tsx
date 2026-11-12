@@ -9,7 +9,8 @@ import { downloadFile, toCsv } from "../../lib/csv";
 import { BatchWriteError, type BatchProgress } from "../../lib/pocketbaseBatch";
 import { analyzeMenuCsv, executeMenuImport, MENU_CSV_HEADERS, parseCsvText, type MenuImportRow } from "../../lib/menuImport";
 import { WEEKDAYS, type Weekday } from "../../lib/semester";
-const DAY_OPTIONS = WEEKDAYS;
+import { isSampleSite } from "../../lib/site";
+const DAY_OPTIONS: readonly Weekday[] = isSampleSite ? WEEKDAYS : ["Monday"];
 
 export default function Menu() {
   const toast = useToast();
@@ -38,6 +39,14 @@ export default function Menu() {
     try {
       const rows = parseCsvText(await file.text());
       const preview = analyzeMenuCsv(rows, items);
+      if (!isSampleSite) {
+        preview.forEach(row => {
+          if (row.status !== "error" && row.days.some(day => day !== "Monday")) {
+            row.status = "error";
+            row.message = "CHS offers Monday service only. Set all other weekday columns to No.";
+          }
+        });
+      }
       setCsvFilename(file.name);
       setCsvRows(preview);
     } catch (error) {
@@ -105,7 +114,7 @@ export default function Menu() {
             <div>
               <p className="font-extrabold text-ink">Bulk menu upload</p>
               <p className="text-sm text-ink-soft">This uploads menu items only; it does not import student orders. Existing items default to Keep Existing unless you choose Update.</p>
-              <p className="mt-1 text-xs text-ink-faint">Use Yes or No for each weekday. Blank Active means active. Items not listed in the CSV are never changed or deleted.</p>
+              <p className="mt-1 text-xs text-ink-faint">Use Yes or No for each weekday. {isSampleSite ? "" : "For CHS, Monday must be Yes and all other days No. "}Blank Active means active. Items not listed in the CSV are never changed or deleted.</p>
             </div>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2">
@@ -180,7 +189,7 @@ export default function Menu() {
                 <button onClick={() => toggleActive(m)}>
                   <Badge tone={m.active ? "green" : "red"}>{m.active ? "Active" : "Inactive"}</Badge>
                 </button>
-                {(m.days ?? []).map((d) => (
+                {(isSampleSite ? (m.days ?? []) : (m.days ?? []).filter(day => day === "Monday")).map((d) => (
                   <Badge key={d} tone="neutral">{d}</Badge>
                 ))}
                 {(m.days ?? []).length === 0 && (
@@ -214,7 +223,7 @@ function MenuForm({
   const [name, setName] = useState(item?.name ?? "");
   const [description, setDescription] = useState(item?.description ?? "");
   const [active, setActive] = useState(item?.active ?? true);
-  const [days, setDays] = useState<Weekday[]>(item?.days ?? [...WEEKDAYS]);
+  const [days, setDays] = useState<Weekday[]>(isSampleSite ? (item?.days ?? [...WEEKDAYS]) : ["Monday"]);
   const [saving, setSaving] = useState(false);
 
   const toggleDay = (day: Weekday) =>
@@ -229,9 +238,9 @@ function MenuForm({
     setSaving(true);
     try {
       if (item) {
-        await pb.collection("menu_items").update(item.id, { name, description, active, days });
+        await pb.collection("menu_items").update(item.id, { name, description, active, days: isSampleSite ? days : ["Monday"] });
       } else {
-        await pb.collection("menu_items").create({ name, description, active, days, school: user!.school });
+        await pb.collection("menu_items").create({ name, description, active, days: isSampleSite ? days : ["Monday"], school: user!.school });
       }
       onSaved();
     } catch {

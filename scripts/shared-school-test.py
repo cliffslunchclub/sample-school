@@ -86,10 +86,15 @@ with tempfile.TemporaryDirectory(prefix='clc-isolation-') as tmp:
    cfg=rows('settings',tok,slug)[0];patch('settings',cfg['id'],{'ordering_days':all_days,'semester_start':'','semester_end':''},tok,slug)
   today=datetime.datetime.now(datetime.timezone.utc).astimezone(datetime.timezone(datetime.timedelta(hours=-4))).date();monday=today+datetime.timedelta(days=(7-today.weekday()))
   meal=create('meal_selections',{'student':st['id'],'parent':cp['record']['id'],'menu_item':m['id'],'delivery_time':d['id'],'school':chs,'lunch_date':str(monday)},cpt,'chs')
+  recurring=create('meal_selections',{'student':st['id'],'parent':cp['record']['id'],'menu_item':m['id'],'delivery_time':d['id'],'school':chs,'recurring_weekday':'Monday'},cpt,'chs')
+  assert recurring['recurring_weekday']=='Monday' and not recurring['lunch_date']
+  patch('meal_selections',recurring['id'],{'delivery_time':''},cpt,'chs')
+  denied('/api/collections/meal_selections/records',{'student':st['id'],'parent':cp['record']['id'],'menu_item':m['id'],'school':chs,'recurring_weekday':'Tuesday'},cpt,'chs')
   create('audit_log',{'admin':ca['id'],'student':st['id'],'new_meal':m['id'],'school':chs,'action':'test'},ct,'chs')
   create('import_history',{'admin':ca['id'],'school':chs,'filename':'test.csv','import_type':'roster'},ct,'chs')
   own_student=rows('students',pt)[0];own_menu=rows('menu_items',pt)[0]
   create('meal_selections',{'school':sample,'student':own_student['id'],'parent':sp['record']['id'],'menu_item':own_menu['id'],'lunch_date':str(monday)},pt)
+  denied('/api/collections/meal_selections/records',{'school':sample,'student':own_student['id'],'parent':sp['record']['id'],'menu_item':own_menu['id'],'recurring_weekday':'Monday'},pt)
   sample_admin=next(u for u in rows('users',sa) if u['role']=='admin')
   create('audit_log',{'school':sample,'admin':sample_admin['id'],'student':own_student['id'],'new_meal':own_menu['id'],'action':'test'},sa)
   create('import_history',{'school':sample,'admin':sample_admin['id'],'filename':'test.csv','import_type':'roster'},sa)
@@ -101,9 +106,9 @@ with tempfile.TemporaryDirectory(prefix='clc-isolation-') as tmp:
     assert all(r['school']!=other for r in rows(name,tok,slug)),name
     for foreign in [r for r in rows(name,su) if r['school']==other][:1]:
      path='/api/collections/'+name+'/records/'+foreign['id'];denied(path,token=tok,slug=slug);denied(path,{},tok,slug,'PATCH');denied(path,token=tok,slug=slug,method='DELETE')
-  assert len(rows('parent_audit_log',ct,'chs'))==1
-  patch('meal_selections',meal['id'],{'menu_item':m['id']},cpt,'chs');assert len(rows('parent_audit_log',ct,'chs'))==1
-  foreign_menu=rows('menu_items',sa)[0];denied('/api/collections/meal_selections/records/'+meal['id'],{'menu_item':foreign_menu['id']},cpt,'chs','PATCH');assert len(rows('parent_audit_log',ct,'chs'))==1
+  assert len(rows('parent_audit_log',ct,'chs'))==3
+  patch('meal_selections',meal['id'],{'menu_item':m['id']},cpt,'chs');assert len(rows('parent_audit_log',ct,'chs'))==3
+  foreign_menu=rows('menu_items',sa)[0];denied('/api/collections/meal_selections/records/'+meal['id'],{'menu_item':foreign_menu['id']},cpt,'chs','PATCH');assert len(rows('parent_audit_log',ct,'chs'))==3
   for tok,slug,user in [(sa,'sample',chs),(ct,'chs',sample)]:denied('/api/collections/grades/records',{'name':'BAD','school':user},tok,slug)
   denied('/api/collections/users/records/'+sp['record']['id'],{'school':chs},pt,method='PATCH')
   denied('/api/collections/users/records/'+sp['record']['id'],{'role':'admin'},pt,method='PATCH')

@@ -22,14 +22,15 @@ export function latestWeekdayTemplate(orders: MealSelection[], weekday: Weekday)
   return { key, orders: key ? matching.filter(order => order.lunch_date.slice(0, 10) === key) : [] };
 }
 
-export function buildLabels(orders: MealSelection[], menu: MenuItem[], times: DeliveryTime[], key: string): LabelSheet {
+export function buildLabels(orders: MealSelection[], menu: MenuItem[], times: DeliveryTime[], key: string, recurringWeekday?: Weekday): LabelSheet {
   const slots: (LunchLabel | null)[] = [];
   const menuMap = new Map(menu.map(m => [m.id, m.name]));
   const timeMap = new Map(times.map(t => [t.id, t.label]));
-  const rows = orders.filter(o => o.lunch_date.slice(0,10) === key).map((o, index) => ({o,index, name:o.expand?.menu_item?.name || menuMap.get(o.menu_item) || "Unknown menu item",time:o.expand?.delivery_time?.label || timeMap.get(o.delivery_time) || "Time not set"}));
+  const rows = orders.filter(o => recurringWeekday ? o.recurring_weekday === recurringWeekday : o.lunch_date?.slice(0,10) === key).map((o, index) => ({o,index, name:o.expand?.menu_item?.name || menuMap.get(o.menu_item) || "Unknown menu item",time:o.expand?.delivery_time?.label || timeMap.get(o.delivery_time) || "Time not set"}));
   rows.sort((a,b) => a.name.localeCompare(b.name) || timeValue(a.time)-timeValue(b.time) || a.time.localeCompare(b.time) || a.index-b.index);
   const newRow = () => {while(slots.length % 3) slots.push(null);};
   let prev = "";
+  const labelDay = recurringWeekday || displayDay(key);
   for (const {o,name,time} of rows) {
     const group = name+"|"+time;
     if (prev && prev !== group) newRow();
@@ -42,7 +43,7 @@ export function buildLabels(orders: MealSelection[], menu: MenuItem[], times: De
       {text:student?.name || "Unknown student",bold:true},
       {text:name},
       {text:staff ? `FACULTY/STAFF ${time}` : [grade,teacher].filter(Boolean).join(" - ")},
-      {text:staff ? displayDay(key) : `${displayDay(key)} - ${time}`},
+      {text:staff ? labelDay : `${labelDay} - ${time}`},
     ]});
   }
   const studentCount = rows.length;

@@ -1,0 +1,33 @@
+name: Verify school app pull request
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --prefix frontend
+      - run: npm test
+      - run: ./frontend/node_modules/.bin/tsc --noEmit -p frontend/tsconfig.app.json
+      - run: npm run build --prefix frontend
+      - name: Install PocketBase for disposable integration tests
+        run: |
+          mkdir -p .runtime
+          curl --fail --location --silent --show-error \
+            "https://github.com/pocketbase/pocketbase/releases/download/v0.28.4/pocketbase_0.28.4_linux_amd64.zip" \
+            --output /tmp/pocketbase.zip
+          unzip -q /tmp/pocketbase.zip pocketbase -d .runtime
+          chmod +x .runtime/pocketbase
+      - name: Check migrations and school isolation
+        run: npm run test:integration

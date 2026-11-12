@@ -10,6 +10,7 @@ import { formatDateTime } from "../../lib/format";
 import { lunchDates, keyOf } from "../../lib/semester";
 import { useSemester } from "../../lib/SemesterContext";
 import { toCsv, downloadFile } from "../../lib/csv";
+import { isSampleSite } from "../../lib/site";
 import type {
   MealSelection as Sel, DeliveryTime, Grade, Teacher, MenuItem, DeliveryRule, Student,
 } from "../../lib/types";
@@ -17,9 +18,10 @@ import type {
 type SortKey = "date" | "time" | "meal" | "student" | "grade" | "teacher" | "parent" | "modified";
 
 /** Derive weekday label from a PocketBase date string safely. */
-function lunchWeekday(dateStr: string): Weekday {
-  const key = keyOf(dateStr); // "YYYY-MM-DD"
-  return weekdayOf(key);
+function lunchWeekday(dateStr: string, recurring?: Weekday): Weekday {
+  if (recurring) return recurring;
+  const key = keyOf(dateStr);
+  return key ? weekdayOf(key) : "Monday";
 }
 
 export default function Orders() {
@@ -45,7 +47,19 @@ export default function Orders() {
   const [addingNew, setAddingNew] = useState(false);
 
   const { start, end } = useSemester();
-  const days = useMemo(() => lunchDates(start, end), [start, end]);
+  const recurring = !isSampleSite;
+  const days = useMemo(() => recurring ? [] : lunchDates(start, end), [start, end, recurring]);
+  const activeOrders = useMemo(() => {
+    if (!recurring) return orders;
+    const weekly = orders.filter(o => o.recurring_weekday === "Monday");
+    if (weekly.length) return weekly;
+    // Show already-imported dated Monday orders as read-only migration preview.
+    const legacy = orders.filter(o => o.lunch_date && lunchWeekday(o.lunch_date) === "Monday")
+      .sort((a,b) => b.lunch_date.localeCompare(a.lunch_date));
+    const latest = legacy[0]?.lunch_date.slice(0, 10);
+    return latest ? legacy.filter(o => o.lunch_date.slice(0, 10) === latest) : [];
+  }, [orders, recurring]);
+  const showingLegacy = recurring && orders.some(o => o.lunch_date) && !orders.some(o => o.recurring_weekday === "Monday");
 
   const load = async () => {
     const [ord, st, dt, gr, te, mi, dr] = await Promise.all([
@@ -71,9 +85,9 @@ export default function Orders() {
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
-    let list = orders.filter((o) => {
+    let list = activeOrders.filter((o) => {
       const st = o.expand?.student;
-      if (fDay && lunchWeekday(o.lunch_date) !== fDay) return false;
+      if (fDay && lunchWeekday(o.lunch_date, o.recurring_weekday) !== fDay) return false;
       if (fTime && o.delivery_time !== fTime) return false;
       if (fGrade && st?.grade !== fGrade) return false;
       if (fTeacher && st?.teacher !== fTeacher) return false;
@@ -86,7 +100,7 @@ export default function Orders() {
     });
     const val = (o: Sel): string | number => {
       switch (sortKey) {
-        case "date":     return o.lunch_date ?? "";
+        case "date":     return o.recurring_weekday ?? o.lunch_date ?? "";
         case "time":     return o.expand?.delivery_time?.label ?? "";
         case "meal":     return o.expand?.menu_item?.name ?? "";
         case "student":  return o.expand?.student?.name ?? "";
@@ -104,7 +118,7 @@ export default function Orders() {
       return 0;
     });
     return list;
-  }, [orders, q, fDay, fTime, fGrade, fTeacher, fMenu, sortKey, sortDir]);
+  }, [activeOrders, q, fDay, fTime, fGrade, fTeacher, fMenu, sortKey, sortDir]);
 
   const toggleSort = (k: SortKey) => {
     if (sortKey === k) setSortDir((d) => (d === 1 ? -1 : 1));
@@ -119,7 +133,7 @@ export default function Orders() {
     const rows = [
       ["Lunch Day", "Delivery Time", "Menu Item", "Student", "Grade", "Teacher", "Parent", "Last Modified"],
       ...filtered.map((o) => [
-        lunchWeekday(o.lunch_date),
+        lunchWeekday(o.lunch_date, o.recurring_weekday),
         o.expand?.delivery_time?.label ?? "",
         o.expand?.menu_item?.name ?? "",
         o.expand?.student?.name ?? "",
@@ -149,10 +163,10 @@ export default function Orders() {
     <div>
       <PageHeader
         title="Orders"
-        desc={`${filtered.length} of ${orders.length} orders`}
+        desc={`${filtered.length} of ${activeOrders.length} orders`}
         action={
           <div className="flex gap-2">
-            <Button onClick={() => setAddingNew(true)}>
+            <Button onClick={() => setAddingNew(true)} disabled={!!showingLegacy}>
               <Plus className="h-4 w-4" /> New Order
             </Button>
             <Button variant="outline" onClick={exportCsv} disabled={filtered.length === 0}>
@@ -162,6 +176,7 @@ export default function Orders() {
         }
       />
 
+      {showingLegacy && <p className="mb-4 text-sm text-amber-700">Showing the latest dated Monday orders as a read-only preview. Import the new Monday roster before creating or editing recurring orders.</p>}
       <Card className="mb-4 p-4">
         {/* Search + clear row */}
         <div className="flex flex-wrap items-center gap-3">
@@ -185,7 +200,7 @@ export default function Orders() {
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <Select value={fDay} onChange={(e) => setFDay(e.target.value as "" | Weekday)}>
             <option value="">All days</option>
-            {WEEKDAYS.map(day => <option key={day} value={day}>{day}</option>)}
+            {(recurring ? ["Monday"] : WEEKDAYS).map(day => <option key={day} value={day}>{day}</option>)}
           </Select>
           <Select value={fTime} onChange={(e) => setFTime(e.target.value)}>
             <option value="">All delivery times</option>
@@ -235,7 +250,7 @@ export default function Orders() {
               <tbody className="divide-y divide-line">
                 {filtered.map((o) => (
                   <tr key={o.id} className="hover:bg-leaf-50/40">
-                    <td className="px-4 py-3 font-bold text-ink">{lunchWeekday(o.lunch_date)}</td>
+                    <td className="px-4 py-3 font-bold text-ink">{lunchWeekday(o.lunch_date, o.recurring_weekday)}</td>
                     <td className="px-4 py-3">
                       <Badge tone="sun">{o.expand?.delivery_time?.label ?? "—"}</Badge>
                     </td>
@@ -250,6 +265,7 @@ export default function Orders() {
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => setEditing(o)}
+                        disabled={!!showingLegacy}
                         className="rounded-lg p-2 text-ink-faint hover:bg-cream-deep hover:text-leaf-700"
                         aria-label="Edit order"
                       >
@@ -269,7 +285,8 @@ export default function Orders() {
         onClose={() => setEditing(null)}
         student={(editing?.expand?.student as Student) ?? null}
         lunchDates={days}
-        fixedLunchKey={editing ? keyOf(editing.lunch_date) : undefined}
+        fixedLunchKey={editing && !recurring ? keyOf(editing.lunch_date) : undefined}
+        existingId={editing?.id}
         currentMenuItem={editing?.menu_item}
         menuItems={menu}
         deliveryTimes={times}

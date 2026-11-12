@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { isSampleSite } from "../../lib/site";
+import RecurringMondaySelection from "./RecurringMondaySelection";
 import { CalendarDays, Lock, CheckCircle2, User, Save, RotateCcw } from "lucide-react";
 import pb from "../../lib/pocketbase";
 import { useAuth } from "../../lib/auth";
@@ -9,6 +11,10 @@ import { useSemester } from "../../lib/SemesterContext";
 import type { Student, MenuItem, DeliveryRule, MealSelection as Sel } from "../../lib/types";
 
 export default function MealSelection() {
+  return isSampleSite ? <DatedMealSelection /> : <RecurringMondaySelection />;
+}
+
+function DatedMealSelection() {
   const { user } = useAuth();
   const toast = useToast();
   const [students, setStudents] = useState<Student[]>([]);
