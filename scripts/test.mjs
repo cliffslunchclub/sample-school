@@ -36,6 +36,41 @@ assert.equal(buildLabels([],menu,times,key).slots.length,0);
 assert.ok(labelsHtml(buildLabels([order('<script>',0)],menu,times,key),'test').includes('&lt;script&gt;'));
 console.log('PASS: five-day calendar and timezone boundaries; label row/page boundaries, separate wrap rows, staff labels, no summaries, escaping and empty dates');
 
+// CHS Order Summary folder labels: matching paired front/tab stickers on Avery 5160.
+const {buildFolderLabels, folderLabelsHtml} = await import(uri(transpile('../frontend/src/lib/folderLabels.ts')));
+const folderTimes = [{id:'early',label:'10:40'},{id:'late',label:'11:40'}];
+const folderData = [
+ ['Bolognese Pasta',2,5],
+ ['Cheeseburger Sliders + TT',20,52],
+ ['Chicken Alfredo Pasta',6,6],
+ ['Chicken Fried Rice',11,8],
+ ['Chicken Katsu Curry Bowl',5,13],
+ ['Chicken Nuggets + TT',24,25],
+ ['Chicken Quesadilla',8,8],
+ ['Chicken Teriyaki Bowl',9,10],
+ ['Grilled Cheese + TT',12,19],
+ ['Grilled Chicken Caesar Wrap',5,8],
+ ['Grilled Chicken Wrap (Plain)',2,1],
+].map(([name,early,late])=>({name,counts:{early,late},total:early+late}));
+const folders=buildFolderLabels(folderData,folderTimes);
+assert.equal(folders.length,15);
+assert.equal(folders.reduce((sum,f)=>sum+f.total,0),259);
+assert.equal(folders.filter(f=>f.wraps).length,1);
+assert.deepEqual(folders.find(f=>f.wraps).entries.map(e=>[e.count,e.caesar,e.plain]),[[7,5,2],[9,8,1]]);
+const folderHtml=folderLabelsHtml(folders);
+const folderTitles=[...folderHtml.matchAll(/class="folder-title">([^<]+)/g)].map(x=>x[1]);
+assert.equal(folderTitles.length,30);
+assert.equal(folderTitles[0],folderTitles[3]); // duplicate front/tab stickers, same column, adjacent rows
+assert.equal(folderTitles[1],folderTitles[4]);
+assert.ok(folderHtml.includes('C = Caesar / P = Plain'));
+assert.ok(folderHtml.includes('Total - 16'));
+assert.equal((folderHtml.match(/class="sheet"/g)||[]).length,1);
+assert.equal((folderLabelsHtml([...folders,...folders]).match(/class="sheet"/g)||[]).length,2);
+assert.equal(buildFolderLabels(folderData,folderTimes,{'Bolognese Pasta':true}).length,16);
+assert.ok(folderLabelsHtml(buildFolderLabels([{name:'<Unsafe & Name>',counts:{early:1},total:1}],folderTimes)).includes('&lt;Unsafe &amp; Name&gt;'));
+assert.equal(buildFolderLabels([{name:'Test',counts:{early:1,other:2},total:3}],folderTimes)[0].entries.at(-1).time,'Unassigned');
+console.log('PASS: CHS folder labels, 259 meals, split/combined folders, wrap quantities, Avery 30-up paired layout, extra pages, escaping, missing slots');
+
 // Import regression: each added day matches, resolves conflicts, and writes the correct date.
 const csvUri=uri(transpile('../frontend/src/lib/csv.ts'));
 const {toCsv}=await import(csvUri);
