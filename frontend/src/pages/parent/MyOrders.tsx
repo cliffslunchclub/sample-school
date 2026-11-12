@@ -39,6 +39,7 @@ export default function MyOrders() {
       entry.items.push(o);
       map.set(k, entry);
     });
+    if (recurring) return Array.from(map.values());
     // Sort: newest week first; within the same week Monday through Friday
     const weekOf = (key: string) => {
       const d = new Date(key + "T12:00:00Z");
