@@ -11,6 +11,7 @@ import { PageHeader } from "../../components/PageHeader";
 import { formatDateTime } from "../../lib/format";
 import { guessColumn, toCsv, downloadFile } from "../../lib/csv";
 import { WEEKDAYS, lunchDates } from "../../lib/semester";
+import { isSampleSite } from "../../lib/site";
 import { useSemester } from "../../lib/SemesterContext";
 import type { MenuItem } from "../../lib/types";
 import {
@@ -47,6 +48,7 @@ export default function ImportData() {
   const { user } = useAuth();
   const toast = useToast();
   const { start, end } = useSemester();
+  const recurring = !isSampleSite;
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep]           = useState<Step>("upload");
@@ -139,7 +141,7 @@ export default function ImportData() {
 
   const runAnalyze = () => {
     if (!parsed || !ref) return;
-    const a = analyzeCombined(parsed.rows, mapping, ref, mondayKey, wednesdayKey, extraKeys);
+    const a = analyzeCombined(parsed.rows, mapping, ref, recurring ? "__recurring_monday__" : mondayKey, recurring ? "" : wednesdayKey, recurring ? {} : extraKeys);
     setAnalysis(a);
     setIssuesOnly(false);
     setStep("preview");
@@ -170,7 +172,7 @@ export default function ImportData() {
     if (!analysis || !ref) return;
     setBusy(true);
     try {
-      const r = await executeCombined(analysis.rows, ref, mondayKey, wednesdayKey, { schoolId: user!.school }, extraKeys);
+      const r = await executeCombined(analysis.rows, ref, recurring ? "__recurring_monday__" : mondayKey, recurring ? "" : wednesdayKey, { schoolId: user!.school }, recurring ? {} : extraKeys);
       await pb.collection("import_history").create({
         filename,
         import_type: "combined",
@@ -259,7 +261,7 @@ export default function ImportData() {
                 <Upload className="h-5 w-5" /> Choose CSV file
               </Button>
               <button
-                onClick={() => downloadFile("cliffs-import-template.csv", toCsv(TEMPLATE_ROWS))}
+                onClick={() => downloadFile("cliffs-import-template.csv", toCsv(recurring ? TEMPLATE_ROWS.map(row => row.slice(0, 5)) : TEMPLATE_ROWS))}
                 className="mt-4 inline-flex items-center gap-1.5 text-sm font-bold text-leaf-700 hover:underline"
               >
                 <Download className="h-4 w-4" /> Download template
@@ -268,8 +270,7 @@ export default function ImportData() {
 
             <div className="mt-4 rounded-xl bg-cream/60 px-4 py-3 text-xs text-ink-soft">
               <strong className="text-ink">Template columns:</strong>{" "}
-              Student Name · Grade · Teacher · Delivery Time · Monday through Friday Meal columns.
-              Leave any day's Meal column blank to skip that day's order.
+              {recurring ? "Student Name · Grade · Teacher · Delivery Time · Monday Meal. Each row is a recurring Monday lunch; no semester dates required." : "Student Name · Grade · Teacher · Delivery Time · Monday through Friday Meal columns. Leave any day's Meal column blank to skip that day's order."}
             </div>
           </Card>
 
@@ -513,8 +514,7 @@ export default function ImportData() {
           <Card className="flex flex-wrap items-center justify-between gap-3 p-4">
             <p className="text-sm text-ink-soft">
               Ready to import <strong className="text-ink">{analysis.stats.valid}</strong> student rows,{" "}
-              <strong className="text-ink">{analysis.stats.mondayOrders}</strong> Monday and{" "}
-              <strong className="text-ink">{analysis.stats.wednesdayOrders}</strong> Wednesday orders, plus {analysis.stats.tuesdayOrders} Tuesday, {analysis.stats.thursdayOrders} Thursday and {analysis.stats.fridayOrders} Friday orders.
+              <strong className="text-ink">{analysis.stats.mondayOrders}</strong> Monday orders{recurring ? " (recurring every week)." : `, ${analysis.stats.wednesdayOrders} Wednesday, ${analysis.stats.tuesdayOrders} Tuesday, ${analysis.stats.thursdayOrders} Thursday and ${analysis.stats.fridayOrders} Friday orders.`}
               {analysis.stats.errors > 0 && <span className="text-tomato-600"> {analysis.stats.errors} error rows will be skipped.</span>}
             </p>
             <div className="flex gap-2">
