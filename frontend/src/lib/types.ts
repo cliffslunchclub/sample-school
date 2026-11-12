@@ -74,6 +74,7 @@ export interface MealSelection {
   id: string;
   student: string;
   lunch_date: string;
+  recurring_weekday?: Weekday;
   menu_item: string;
   delivery_time: string;
   parent: string;
