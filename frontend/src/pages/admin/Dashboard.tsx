@@ -4,6 +4,7 @@ import { Users2, GraduationCap, UtensilsCrossed, Table2, Sigma, FileUp, ArrowRig
 import pb from "../../lib/pocketbase";
 import { Card, Spinner } from "../../components/ui";
 import { PageHeader } from "../../components/PageHeader";
+import { isSampleSite } from "../../lib/site";
 
 export default function Dashboard() {
   const [stats, setStats] = useState<Record<string, number>>({});
@@ -17,7 +18,7 @@ export default function Dashboard() {
         count("users", 'role = "parent"'),
         count("students", "active = true"),
         count("menu_items", "active = true"),
-        count("meal_selections"),
+        count("meal_selections", isSampleSite ? "" : 'recurring_weekday = "Monday"'),
       ]);
       setStats({ parents, students, menu, orders });
       setLoading(false);
@@ -30,7 +31,7 @@ export default function Dashboard() {
     { label: "Parents",           value: stats.parents,  icon: Users2,          to: "/admin/parents"  },
     { label: "Active students",   value: stats.students, icon: GraduationCap,   to: "/admin/students" },
     { label: "Active menu items", value: stats.menu,     icon: UtensilsCrossed, to: "/admin/menu"     },
-    { label: "Total orders",      value: stats.orders,   icon: Table2,          to: "/admin/orders"   },
+    { label: isSampleSite ? "Total orders" : "Monday lunches", value: stats.orders,   icon: Table2,          to: "/admin/orders"   },
   ];
 
   const quick = [
