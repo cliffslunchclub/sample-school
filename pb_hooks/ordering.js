@@ -2,6 +2,14 @@
 module.exports = {
   process: (e, action) => {
     require(__hooks + "/school-isolation.js").validate(e)
+    // Enforce the CHS-only recurring schedule for administrators as well as parents.
+    const requestedWeekday=e.record.getString("recurring_weekday")
+    if (requestedWeekday) {
+      const school=e.app.findRecordById("schools",e.record.getString("school"))
+      if (school.getString("slug")!=="chs" || requestedWeekday!=="Monday" || e.record.getString("lunch_date")) {
+        throw new BadRequestError("Recurring lunches are Monday-only at CHS and must not include a calendar date.")
+      }
+    }
     if (!e.auth || e.auth.getString("role") !== "parent") return e.next()
     if (!e.auth.getBool("active")) throw new ForbiddenError("Your account is inactive.")
     const app=e.app
