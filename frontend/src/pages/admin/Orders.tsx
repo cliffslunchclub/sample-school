@@ -45,21 +45,24 @@ export default function Orders() {
 
   const [editing, setEditing] = useState<Sel | null>(null);
   const [addingNew, setAddingNew] = useState(false);
+  const [orderView, setOrderView] = useState<"current" | "history">("current");
 
   const { start, end } = useSemester();
   const recurring = !isSampleSite;
   const days = useMemo(() => recurring ? [] : lunchDates(start, end), [start, end, recurring]);
-  const activeOrders = useMemo(() => {
-    if (!recurring) return orders;
-    const weekly = orders.filter(o => o.recurring_weekday === "Monday");
-    if (weekly.length) return weekly;
-    // Show already-imported dated Monday orders as read-only migration preview.
-    const legacy = orders.filter(o => o.lunch_date && lunchWeekday(o.lunch_date) === "Monday")
-      .sort((a,b) => b.lunch_date.localeCompare(a.lunch_date));
-    const latest = legacy[0]?.lunch_date.slice(0, 10);
-    return latest ? legacy.filter(o => o.lunch_date.slice(0, 10) === latest) : [];
-  }, [orders, recurring]);
-  const showingLegacy = recurring && orders.some(o => o.lunch_date) && !orders.some(o => o.recurring_weekday === "Monday");
+  const currentOrders = useMemo(
+    () => orders.filter(o => o.recurring_weekday === "Monday"),
+    [orders],
+  );
+  const legacyOrders = useMemo(() => {
+    const dated = orders.filter(o => o.lunch_date && !o.recurring_weekday && lunchWeekday(o.lunch_date) === "Monday");
+    // Keep archived history visible as the latest complete Monday set rather than
+    // combining prior weeks into one misleading roster.
+    const newest = dated.reduce((key, o) => o.lunch_date.slice(0, 10) > key ? o.lunch_date.slice(0, 10) : key, "");
+    return dated.filter(o => o.lunch_date.slice(0, 10) === newest);
+  }, [orders]);
+  const showingLegacy = recurring && orderView === "history";
+  const activeOrders = recurring ? (showingLegacy ? legacyOrders : currentOrders) : orders;
 
   const load = async () => {
     const [ord, st, dt, gr, te, mi, dr] = await Promise.all([
@@ -143,7 +146,7 @@ export default function Orders() {
         formatDateTime(o.updated),
       ]),
     ];
-    downloadFile(`cliffs-orders-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(rows));
+    downloadFile(`cliffs-orders-${recurring ? (showingLegacy ? "historical-" : "recurring-") : ""}${new Date().toISOString().slice(0, 10)}.csv`, toCsv(rows));
   };
 
   const cols: { key: SortKey; label: string }[] = [
@@ -163,10 +166,10 @@ export default function Orders() {
     <div>
       <PageHeader
         title="Orders"
-        desc={`${filtered.length} of ${activeOrders.length} orders`}
+        desc={recurring ? `${filtered.length} of ${activeOrders.length} ${showingLegacy ? "historical Monday orders" : "recurring Monday orders"}` : `${filtered.length} of ${activeOrders.length} orders`}
         action={
           <div className="flex gap-2">
-            <Button onClick={() => setAddingNew(true)} disabled={!!showingLegacy}>
+            <Button onClick={() => setAddingNew(true)}>
               <Plus className="h-4 w-4" /> New Order
             </Button>
             <Button variant="outline" onClick={exportCsv} disabled={filtered.length === 0}>
@@ -176,7 +179,15 @@ export default function Orders() {
         }
       />
 
-      {showingLegacy && <p className="mb-4 text-sm text-amber-700">Showing the latest dated Monday orders as a read-only preview. Import the new Monday roster before creating or editing recurring orders.</p>}
+      {recurring && <div className="mb-4 flex flex-wrap gap-2">
+        <Button variant={orderView === "current" ? "primary" : "outline"} onClick={() => setOrderView("current")}>
+          Current Monday roster ({currentOrders.length})
+        </Button>
+        <Button variant={orderView === "history" ? "primary" : "outline"} onClick={() => setOrderView("history")}>
+          Previous dated orders ({legacyOrders.length})
+        </Button>
+      </div>}
+      {showingLegacy && <p className="mb-4 text-sm text-amber-700">Showing the last saved dated Monday orders for reference only. They cannot be edited. You can always create a new recurring Monday order using New Order.</p>}
       <Card className="mb-4 p-4">
         {/* Search + clear row */}
         <div className="flex flex-wrap items-center gap-3">
@@ -225,7 +236,7 @@ export default function Orders() {
         <EmptyState
           icon={<Table2 className="h-7 w-7" />}
           title="No matching orders"
-          desc="Try adjusting your filters or search."
+          desc={recurring && !showingLegacy && currentOrders.length === 0 ? "No recurring Monday orders yet. Use New Order or Import Data to create the weekly roster." : "Try adjusting your filters or search."}
         />
       ) : (
         <Card className="overflow-hidden">
@@ -265,9 +276,9 @@ export default function Orders() {
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => setEditing(o)}
-                        disabled={!!showingLegacy}
+                        disabled={recurring && !o.recurring_weekday}
                         className="rounded-lg p-2 text-ink-faint hover:bg-cream-deep hover:text-leaf-700"
-                        aria-label="Edit order"
+                        aria-label={recurring && !o.recurring_weekday ? "Historical order is read-only" : "Edit order"}
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
@@ -281,7 +292,7 @@ export default function Orders() {
       )}
 
       <MealOverrideModal
-        open={!!editing}
+        open={!!editing && !(recurring && !editing.recurring_weekday)}
         onClose={() => setEditing(null)}
         student={(editing?.expand?.student as Student) ?? null}
         lunchDates={days}

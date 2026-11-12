@@ -106,4 +106,53 @@ assert.equal(recLabels.studentCount,2);
 assert.ok(recLabels.slots.filter(Boolean).every(l=>l.lines.some(x=>x.text.startsWith('Monday'))));
 console.log('PASS: recurring Monday import, two distinct meals, duplicate prevention, undated labels');
 
+// Delivery time deletion plans must preserve references until replacement succeeds.
+// Linked historical orders should be included in the explicit reassign-and-delete path.
+const deletionCode=transpile('../frontend/src/lib/deleteDeliveryTime.ts')
+  .replace('import pb from "./pocketbase";','const pb = globalThis.__deliveryDeletionMock;')
+  .replace('import { sendBatchRequests } from "./pocketbaseBatch";','const {sendBatchRequests} = globalThis;');
+const delMock={
+  orders:[
+    {id:'dated',delivery_time:'old',lunch_date:'2026-10-12T12:00:00Z'},
+    {id:'weekly',delivery_time:'old',lunch_date:'',recurring_weekday:'Monday'},
+  ],
+  rules:[{id:'classrule',delivery_time:'old'}],
+  deleted:[],
+  collection(name){
+    if(name==='delivery_time_slots') return {
+      getOne:async(id)=>({id,active:id==='new'}),
+      delete:async(id)=>{assert.equal(this.orders.filter(o=>o.delivery_time===id).length,0);assert.equal(this.rules.filter(o=>o.delivery_time===id).length,0);this.deleted.push(id)},
+    };
+    const records=name==='meal_selections'?this.orders:this.rules;
+    return {getFullList:async({filter})=>{
+      const id=filter.match(/delivery_time = "([^"]+)"/)?.[1];
+      return records.filter(row=>row.delivery_time===id);
+    }};
+  },
+};
+globalThis.__deliveryDeletionMock=delMock;
+const {buildTimeReassignmentRequests,removeDeliveryTime}=await import(uri(deletionCode));
+const built=buildTimeReassignmentRequests({orders:delMock.orders,rules:delMock.rules},'new');
+assert.equal(built.length,3);
+assert.deepEqual(built.map(x=>x.url.split('/').slice(-3).join('/')),[
+  'meal_selections/records/dated','meal_selections/records/weekly','delivery_rules/records/classrule',
+]);
+assert.ok(built.every(x=>x.method==='PATCH' && x.body.delivery_time==='new'));
+await assert.rejects(()=>removeDeliveryTime('old',''),/replacement or deactivate/);
+assert.deepEqual(delMock.deleted,[]);
+const previousSend=globalThis.__importMock.send;
+globalThis.__importMock.send=async(_path,{body})=>body.requests.map(request=>{
+  const id=request.url.split('/').at(-1);
+  const records=request.url.includes('meal_selections')?delMock.orders:delMock.rules;
+  const target=records.find(row=>row.id===id);
+  assert.ok(target);
+  target.delivery_time=request.body.delivery_time;
+  return {status:200,body:target};
+});
+const removed=await removeDeliveryTime('old','new');
+assert.deepEqual(removed,{reassignedOrders:2,reassignedRules:1});
+assert.deepEqual(delMock.deleted,['old']);
+globalThis.__importMock.send=previousSend;
+console.log('PASS: time slot deletion requires replacement, migrates both historical and recurring references, and deletes only after verifying no links');
+
 console.log('PASS: five-day order CSV; menu CSV template parsing, safe matching, explicit update; transactional batch writes/deletes; 40-record chunking; 429 retry; conflict keep/replace behavior');

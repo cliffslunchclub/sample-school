@@ -5,6 +5,7 @@ import { useAuth } from "../../lib/auth";
 import { Card, Button, Input, Select, Field, Modal, Spinner, Badge, useToast } from "../../components/ui";
 import { PageHeader } from "../../components/PageHeader";
 import type { DeliveryTime, DeliveryRule, Grade, Teacher } from "../../lib/types";
+import { getTimeUsage, removeDeliveryTime, type TimeUsage } from "../../lib/deleteDeliveryTime";
 
 export default function DeliveryTimes() {
   const toast = useToast();
@@ -15,6 +16,11 @@ export default function DeliveryTimes() {
   const [loading, setLoading] = useState(true);
   const [timeModal, setTimeModal] = useState<DeliveryTime | null | undefined>(undefined);
   const [ruleModal, setRuleModal] = useState<DeliveryRule | null | undefined>(undefined);
+  const [deleteSlot, setDeleteSlot] = useState<DeliveryTime | null>(null);
+  const [usage, setUsage] = useState<TimeUsage | null>(null);
+  const [replacementId, setReplacementId] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [checkingDelete, setCheckingDelete] = useState(false);
 
   const load = async () => {
     const [dt, dr, gr, te] = await Promise.all([
@@ -40,6 +46,63 @@ export default function DeliveryTimes() {
     toast("Rule removed");
     load();
   };
+  const closeDelete = () => {
+    if (deleting) return;
+    setDeleteSlot(null);
+    setUsage(null);
+    setReplacementId("");
+  };
+  const openDelete = async (slot: DeliveryTime) => {
+    setDeleteSlot(slot);
+    setUsage(null);
+    setReplacementId("");
+    setCheckingDelete(true);
+    try {
+      setUsage(await getTimeUsage(slot.id));
+    } catch {
+      toast("Could not check the time slot's linked records. Try again.", "error");
+      setDeleteSlot(null);
+    } finally {
+      setCheckingDelete(false);
+    }
+  };
+  const confirmDelete = async () => {
+    if (!deleteSlot || !usage || deleting) return;
+    const linked = usage.orders.length + usage.rules.length;
+    if (linked && !replacementId) {
+      toast("Choose an active replacement time slot first.", "error");
+      return;
+    }
+    setDeleting(true);
+    try {
+      const result = await removeDeliveryTime(deleteSlot.id, replacementId);
+      toast(result.reassignedOrders || result.reassignedRules
+        ? `Deleted ${deleteSlot.label}: moved ${result.reassignedOrders} orders and ${result.reassignedRules} rules.`
+        : `Deleted ${deleteSlot.label}.`);
+      setDeleteSlot(null);
+      setUsage(null);
+      setReplacementId("");
+      await load();
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not delete time slot.", "error");
+      try { setUsage(await getTimeUsage(deleteSlot.id)); } catch { setUsage(null); }
+    } finally {
+      setDeleting(false);
+    }
+  };
+  const deactivateInstead = async () => {
+    if (!deleteSlot || deleting) return;
+    setDeleting(true);
+    try {
+      await pb.collection("delivery_time_slots").update(deleteSlot.id, { active: false });
+      toast(`Deactivated ${deleteSlot.label}. Its existing order history was preserved.`);
+      setDeleteSlot(null);
+      setUsage(null);
+      await load();
+    } catch {
+      toast("Could not deactivate this time slot.", "error");
+    } finally { setDeleting(false); }
+  };
 
   if (loading) return <Spinner label="Loading…" />;
 
@@ -59,7 +122,8 @@ export default function DeliveryTimes() {
                 <span className="font-bold text-ink">{t.label}</span>
                 <div className="flex items-center gap-2">
                   <button onClick={() => toggleTime(t)}><Badge tone={t.active ? "green" : "red"}>{t.active ? "Active" : "Inactive"}</Badge></button>
-                  <button onClick={() => setTimeModal(t)} className="rounded-lg p-1.5 text-ink-faint hover:bg-cream-deep hover:text-leaf-700"><Pencil className="h-4 w-4" /></button>
+                  <button onClick={() => setTimeModal(t)} aria-label={`Edit ${t.label}`} className="rounded-lg p-1.5 text-ink-faint hover:bg-cream-deep hover:text-leaf-700"><Pencil className="h-4 w-4" /></button>
+                  <button onClick={() => void openDelete(t)} aria-label={`Delete ${t.label}`} title={`Delete ${t.label}`} className="rounded-lg p-1.5 text-ink-faint hover:bg-tomato-50 hover:text-tomato-600"><Trash2 className="h-4 w-4" /></button>
                 </div>
               </div>
             ))}
@@ -98,6 +162,43 @@ export default function DeliveryTimes() {
       )}
       {ruleModal !== undefined && (
         <RuleForm rule={ruleModal} grades={grades} teachers={teachers} times={times} onClose={() => setRuleModal(undefined)} onSaved={() => { setRuleModal(undefined); load(); toast("Saved"); }} />
+      )}
+      {deleteSlot && (
+        <Modal open onClose={closeDelete} title={`Delete ${deleteSlot.label}?`}>
+          {checkingDelete || !usage ? <Spinner label="Checking linked records…" /> : (
+            <div className="space-y-4">
+              <p className="text-sm text-ink-soft">
+                This time slot is assigned to <strong>{usage.orders.length} meal orders</strong> and <strong>{usage.rules.length} delivery rules</strong>.
+              </p>
+              {usage.orders.length + usage.rules.length === 0 ? (
+                <p className="text-sm text-tomato-700">This unused time slot can be deleted permanently. The action cannot be undone.</p>
+              ) : (
+                <>
+                  <Field label="Move linked orders and rules to">
+                    <Select value={replacementId} onChange={(e) => setReplacementId(e.target.value)} disabled={deleting}>
+                      <option value="">Select an active replacement time…</option>
+                      {times.filter(t => t.id !== deleteSlot.id && t.active).map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                    </Select>
+                  </Field>
+                  <p className="text-sm text-tomato-700">
+                    Reassigning will also change the delivery time recorded on <strong>{usage.orders.filter(o => !o.recurring_weekday).length} historical dated orders</strong>.
+                    To keep historical delivery times unchanged, choose Deactivate instead.
+                  </p>
+                </>
+              )}
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button type="button" variant="outline" onClick={closeDelete} disabled={deleting}>Cancel</Button>
+                {usage.orders.length + usage.rules.length > 0 &&
+                  <Button type="button" variant="outline" onClick={() => void deactivateInstead()} disabled={deleting}>Deactivate instead</Button>}
+                <Button type="button" variant="danger" loading={deleting}
+                  disabled={deleting || (usage.orders.length + usage.rules.length > 0 && !replacementId)}
+                  onClick={() => void confirmDelete()}>
+                  {usage.orders.length + usage.rules.length > 0 ? "Reassign & delete" : "Delete time slot"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </Modal>
       )}
     </div>
   );
