@@ -1,14 +1,15 @@
 import { WEEKDAYS, type Weekday } from "../../lib/semester";
 import { useEffect, useMemo, useState } from "react";
-import { Sigma, Printer, Download } from "lucide-react";
+import { Sigma, Printer, Download, FolderOpen } from "lucide-react";
 import pb from "../../lib/pocketbase";
-import { Card, Select, Spinner, EmptyState } from "../../components/ui";
+import { Card, Select, Spinner, EmptyState, Modal } from "../../components/ui";
 import { PageHeader } from "../../components/PageHeader";
 import { weekdayOf } from "../../lib/semester";
 import { isSampleSite } from "../../lib/site";
 import { useSemester } from "../../lib/SemesterContext";
 import { toCsv, downloadFile } from "../../lib/csv";
 import type { MealSelection as Sel, DeliveryTime } from "../../lib/types";
+import { buildFolderLabels, defaultSeparate, folderLabelsHtml, isCaesarWrap, isPlainWrap } from "../../lib/folderLabels";
 
 
 
@@ -23,6 +24,27 @@ export default function Summary() {
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState("");
   const [legacyFallback, setLegacyFallback] = useState(false);
+  const [folderLabelsOpen, setFolderLabelsOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  // The defaults are shared through source code. Personal adjustments are
+  // remembered only in the administrator's browser, not in student records.
+  const [folderOverrides, setFolderOverrides] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("chs-folder-modes-v1") || "{}");
+      return saved && typeof saved === "object" && !Array.isArray(saved) ? saved : {};
+    } catch { return {}; }
+  });
+  const [combineWraps, setCombineWraps] = useState(() => {
+    try { return localStorage.getItem("chs-folder-combine-wraps-v1") !== "false"; }
+    catch { return true; }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("chs-folder-modes-v1", JSON.stringify(folderOverrides));
+      localStorage.setItem("chs-folder-combine-wraps-v1", String(combineWraps));
+    } catch { /* Private browsing and restricted storage are supported. */ }
+  }, [folderOverrides, combineWraps]);
 
   useEffect(() => {
     (async () => {
@@ -72,7 +94,7 @@ export default function Summary() {
       }
     })();
     return () => { cancelled = true; };
-  }, [weekday, start, end, recurring]);
+  }, [weekday, start, end, recurring, refreshKey]);
 
   const { rows, colTotals, grand } = useMemo(() => {
     const timeIds = times.map((t) => t.id);
@@ -95,6 +117,22 @@ export default function Summary() {
     return { rows, colTotals, grand };
   }, [orders, times]);
 
+  const folders = useMemo(
+    () => buildFolderLabels(rows, times, folderOverrides, combineWraps),
+    [rows, times, folderOverrides, combineWraps],
+  );
+  const wrapPresent = rows.some(row => isCaesarWrap(row.name) || isPlainWrap(row.name));
+  const toggleSeparate = (name: string, value: boolean) => {
+    setFolderOverrides(previous => ({ ...previous, [name]: value }));
+  };
+  const previewFolderLabels = () => {
+    if (fetching || error || folders.length === 0) return;
+    const html = folderLabelsHtml(folders);
+    const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+    window.open(url, "_blank", "noopener,noreferrer");
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  };
+
   const exportCsv = () => {
     const header = ["Menu Item", ...times.map((t) => t.label), "Total"];
     const dataRows = rows.map((r) => [r.name, ...times.map((t) => String(r.counts[t.id] ?? 0)), String(r.total)]);
@@ -114,6 +152,12 @@ export default function Summary() {
             <button onClick={exportCsv} disabled={rows.length === 0} className="inline-flex h-11 items-center gap-2 rounded-xl border border-line bg-white px-4 text-sm font-bold text-ink hover:bg-cream-deep disabled:opacity-40">
               <Download className="h-4 w-4" /> CSV
             </button>
+            {recurring && <button
+              onClick={() => { setFolderLabelsOpen(true); setRefreshKey(key => key + 1); }}
+              className="inline-flex h-11 items-center gap-2 rounded-xl border border-line bg-white px-4 text-sm font-bold text-ink hover:bg-cream-deep"
+            >
+              <FolderOpen className="h-4 w-4" /> Folder Labels
+            </button>}
             <button onClick={() => window.print()} className="inline-flex h-11 items-center gap-2 rounded-xl border border-line bg-white px-4 text-sm font-bold text-ink hover:bg-cream-deep">
               <Printer className="h-4 w-4" /> Print
             </button>
@@ -172,6 +216,75 @@ export default function Summary() {
           </div>
         </Card>
       )}
+
+      <Modal open={folderLabelsOpen} onClose={() => setFolderLabelsOpen(false)} title="Folder Labels" wide>
+        <div className="space-y-5">
+          <p className="text-sm text-ink-soft">
+            Avery 5160 / 8160 · 1 × 2⅝ inch · 30 labels per Letter sheet.
+            Each folder receives two matching labels for its front and tab.
+          </p>
+          <label className="flex items-center gap-3 rounded-xl border border-line bg-white p-3">
+            <input
+              type="checkbox"
+              checked={combineWraps}
+              disabled={!wrapPresent}
+              onChange={event => setCombineWraps(event.target.checked)}
+              className="h-4 w-4 accent-leaf-600"
+            />
+            <span className="text-sm font-bold text-ink">Combine Caesar and Plain Chicken Wraps in one folder</span>
+          </label>
+          <div>
+            <p className="mb-2 text-sm font-bold text-ink">Folder setup</p>
+            <p className="mb-3 text-xs text-ink-soft">
+              Check “Separate” to make one folder for each delivery time.
+              Unchecked items share a folder across both times.
+            </p>
+            <div className="max-h-[45vh] divide-y divide-line overflow-y-auto rounded-xl border border-line bg-white">
+              {rows.map(row => {
+                const joinedWrap = combineWraps && (isCaesarWrap(row.name) || isPlainWrap(row.name));
+                return <label key={row.name} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <span className="min-w-0">
+                    <span className="block text-sm font-bold text-ink">{row.name}</span>
+                    <span className="block text-xs text-ink-soft">{joinedWrap ? "Shared Grilled Chicken Wraps folder" : `${row.total} total`}</span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-2 text-sm text-ink-soft">
+                    <input
+                      type="checkbox"
+                      disabled={joinedWrap}
+                      checked={!joinedWrap && (folderOverrides[row.name] ?? defaultSeparate(row.name))}
+                      onChange={event => toggleSeparate(row.name, event.target.checked)}
+                      className="h-4 w-4 accent-leaf-600"
+                      aria-label={`Separate delivery times for ${row.name}`}
+                    />
+                    Separate
+                  </span>
+                </label>;
+              })}
+            </div>
+          </div>
+          {fetching ? (
+            <p className="text-sm text-ink-soft">Refreshing order counts…</p>
+          ) : error ? (
+            <p role="alert" className="text-sm text-red-700">{error}</p>
+          ) : (
+            <p className="text-sm font-bold text-ink">
+              {folders.length} folders · {folders.length * 2} stickers · {Math.ceil(folders.length / 15)} Letter {Math.ceil(folders.length / 15) === 1 ? "sheet" : "sheets"}
+              <span className="block pt-1 text-xs font-normal text-ink-soft">{grand} meals accounted for in the summary.</span>
+            </p>
+          )}
+          <button
+            onClick={previewFolderLabels}
+            disabled={fetching || !!error || folders.length === 0}
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-leaf-600 px-5 text-sm font-bold text-white hover:bg-leaf-700 disabled:opacity-40"
+          >
+            <Printer className="h-4 w-4" /> Preview / Print / Save PDF
+          </button>
+          <p className="text-xs text-ink-soft">
+            Print at Actual Size (100%) on US Letter, with browser headers and footers disabled.
+            Folder choices made here are saved in this browser.
+          </p>
+        </div>
+      </Modal>
     </div>
   );
 }
