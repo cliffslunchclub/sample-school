@@ -78,4 +78,32 @@ const menuBad=analyzeMenuCsv(parseCsvText(toCsv([MENU_CSV_HEADERS,['Bad Meal',''
 const purgeProgress={count:0,records:0};writes.length=0;batchCalls=0;batchSizes.length=0;failNextBatch=true;
 await sendBatchRequests(Array.from({length:85},(_,i)=>({method:'DELETE',url:`/api/collections/meal_selections/records/${i}`})),'Meal selections',purgeProgress);
 assert.equal(purgeProgress.count,3);assert.equal(purgeProgress.records,85);assert.equal(batchCalls,4);assert.deepEqual(batchSizes,[40,40,40,5]);
+// CHS recurring Monday: importing two different lunches for one student must
+// preserve both while ignoring an exactly repeated CSV line.
+const recurringRef={...ref,times:[{id:'late',label:'11:40',active:true}],selections:[]};
+const recRows=[
+  ['Demo Student','Grade 3','Teacher','11:40',names[0]],
+  ['Demo Student','Grade 3','Teacher','11:40',names[1]],
+  ['Demo Student','Grade 3','Teacher','11:40',names[0]],
+];
+const recMap={student_name:0,grade:1,teacher:2,delivery_time:3,monday_meal:4};
+const recAnalysis=analyzeCombined(recRows,recMap,recurringRef,'__recurring_monday__','',{});
+assert.equal(recAnalysis.stats.valid,2);
+assert.equal(recAnalysis.stats.duplicates,1);
+assert.equal(recAnalysis.stats.mondayOrders,2);
+writes.length=0;
+const recExecuted=await executeCombined(recAnalysis.rows,recurringRef,'__recurring_monday__','',{schoolId:'school'},{});
+assert.equal(recExecuted.createdMeals,2);
+const recWrites=writes.filter(p=>p.url==='/api/collections/meal_selections/records');
+assert.equal(recWrites.length,2);
+assert.ok(recWrites.every(p=>p.body.recurring_weekday==='Monday' && p.body.lunch_date===''));
+const recLabels=buildLabels(recWrites.map((p,i)=>({
+  ...order(String(i),i),
+  lunch_date:'',
+  recurring_weekday:'Monday',
+})),menu,recurringRef.times,'','Monday');
+assert.equal(recLabels.studentCount,2);
+assert.ok(recLabels.slots.filter(Boolean).every(l=>l.lines.some(x=>x.text.startsWith('Monday'))));
+console.log('PASS: recurring Monday import, two distinct meals, duplicate prevention, undated labels');
+
 console.log('PASS: five-day order CSV; menu CSV template parsing, safe matching, explicit update; transactional batch writes/deletes; 40-record chunking; 429 retry; conflict keep/replace behavior');
