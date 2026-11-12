@@ -166,7 +166,7 @@ export default function Orders() {
         desc={`${filtered.length} of ${activeOrders.length} orders`}
         action={
           <div className="flex gap-2">
-            <Button onClick={() => setAddingNew(true)}>
+            <Button onClick={() => setAddingNew(true)} disabled={!!showingLegacy}>
               <Plus className="h-4 w-4" /> New Order
             </Button>
             <Button variant="outline" onClick={exportCsv} disabled={filtered.length === 0}>
@@ -176,7 +176,7 @@ export default function Orders() {
         }
       />
 
-      {showingLegacy && <p className="mb-4 text-sm text-amber-700">Showing latest dated Monday orders until the recurring roster is imported. Existing records remain historical.</p>}
+      {showingLegacy && <p className="mb-4 text-sm text-amber-700">Showing the latest dated Monday orders as a read-only preview. Import the new Monday roster before creating or editing recurring orders.</p>}
       <Card className="mb-4 p-4">
         {/* Search + clear row */}
         <div className="flex flex-wrap items-center gap-3">
@@ -265,6 +265,7 @@ export default function Orders() {
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => setEditing(o)}
+                        disabled={!!showingLegacy}
                         className="rounded-lg p-2 text-ink-faint hover:bg-cream-deep hover:text-leaf-700"
                         aria-label="Edit order"
                       >
