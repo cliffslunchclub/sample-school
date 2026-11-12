@@ -109,6 +109,20 @@ with tempfile.TemporaryDirectory(prefix='clc-isolation-') as tmp:
   assert len(rows('parent_audit_log',ct,'chs'))==3
   patch('meal_selections',meal['id'],{'menu_item':m['id']},cpt,'chs');assert len(rows('parent_audit_log',ct,'chs'))==3
   foreign_menu=rows('menu_items',sa)[0];denied('/api/collections/meal_selections/records/'+meal['id'],{'menu_item':foreign_menu['id']},cpt,'chs','PATCH');assert len(rows('parent_audit_log',ct,'chs'))==3
+  # The admin may reassign an in-use time slot, then delete it without
+  # losing orders or classroom rules. Sample School remains isolated.
+  replacement=create('delivery_time_slots',{'label':'13:00','school':chs,'active':True},ct,'chs')
+  moved=ok('/api/batch',{'requests':[
+    {'method':'PATCH','url':'/api/collections/meal_selections/records/'+meal['id'],'body':{'delivery_time':replacement['id']}},
+    {'method':'PATCH','url':'/api/collections/delivery_rules/records/'+rule['id'],'body':{'delivery_time':replacement['id']}},
+  ]},ct,'chs')
+  assert len(moved)==2 and all(item['status']==200 for item in moved)
+  assert not [x for x in rows('meal_selections',ct,'chs') if x['delivery_time']==d['id']]
+  assert not [x for x in rows('delivery_rules',ct,'chs') if x['delivery_time']==d['id']]
+  ok('/api/collections/delivery_time_slots/records/'+d['id'],token=ct,slug='chs',method='DELETE')
+  assert rows('meal_selections',ct,'chs')[0]['school']==chs
+  assert any(x['delivery_time']==replacement['id'] for x in rows('delivery_rules',ct,'chs'))
+
   for tok,slug,user in [(sa,'sample',chs),(ct,'chs',sample)]:denied('/api/collections/grades/records',{'name':'BAD','school':user},tok,slug)
   denied('/api/collections/users/records/'+sp['record']['id'],{'school':chs},pt,method='PATCH')
   denied('/api/collections/users/records/'+sp['record']['id'],{'role':'admin'},pt,method='PATCH')
