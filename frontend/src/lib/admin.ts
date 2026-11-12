@@ -29,16 +29,20 @@ export async function adminSetMeal(opts: {
   const lunchIso = opts.recurringWeekday ? "" : isoForKey(lunchKey);
 
   let existing = null;
-  try {
-    existing = opts.existingId
-      ? await pb.collection("meal_selections").getOne(opts.existingId, { requestKey: null })
-      : await pb.collection("meal_selections").getFirstListItem(
+  if (opts.existingId) {
+    // Editing an existing lunch must never silently create another one if
+    // the record could not be loaded.
+    existing = await pb.collection("meal_selections").getOne(opts.existingId, { requestKey: null });
+  } else {
+    try {
+      existing = await pb.collection("meal_selections").getFirstListItem(
         opts.recurringWeekday
           ? `student = "${student.id}" && recurring_weekday = "${opts.recurringWeekday}"`
           : `student = "${student.id}" && ${dayFilter("lunch_date", lunchKey)}`,
         { requestKey: null });
-  } catch {
-    existing = null;
+    } catch {
+      existing = null;
+    }
   }
 
   const previousMeal = existing ? existing.menu_item : "";
