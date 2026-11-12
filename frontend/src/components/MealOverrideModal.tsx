@@ -4,6 +4,7 @@ import { Modal, Field, Select, Textarea, Button, useToast } from "./ui";
 import { adminSetMeal, deriveDeliveryTime } from "../lib/admin";
 import { keyOf, type LunchDate } from "../lib/semester";
 import { useAuth } from "../lib/auth";
+import { isSampleSite } from "../lib/site";
 import type { Student, MenuItem, DeliveryTime, DeliveryRule } from "../lib/types";
 
 
@@ -27,6 +28,7 @@ export function MealOverrideModal({
   student,
   lunchDates,
   fixedLunchKey,
+  existingId,
   currentMenuItem,
   menuItems,
   deliveryTimes,
@@ -38,6 +40,7 @@ export function MealOverrideModal({
   student: Student | null;
   lunchDates: LunchDate[];
   fixedLunchKey?: string;
+  existingId?: string;
   currentMenuItem?: string;
   menuItems: MenuItem[];
   deliveryTimes: DeliveryTime[];
@@ -46,6 +49,7 @@ export function MealOverrideModal({
 }) {
   const { user } = useAuth();
   const toast = useToast();
+  const recurring = !isSampleSite;
 
   // When fixedLunchKey is given, weekday is derived from it (read-only).
   // When free, admin picks a weekday and we resolve to the next occurrence.
@@ -71,7 +75,7 @@ export function MealOverrideModal({
       toast("Choose a meal", "error");
       return;
     }
-    const lunchKey = fixedLunchKey ?? resolveKey(weekday, lunchDates);
+    const lunchKey = recurring ? "__recurring_monday__" : (fixedLunchKey ?? resolveKey(weekday, lunchDates));
     if (!lunchKey) {
       toast("No matching lunch date found", "error");
       return;
@@ -81,6 +85,8 @@ export function MealOverrideModal({
       await adminSetMeal({
         student,
         lunchKey,
+        recurringWeekday: recurring ? "Monday" : undefined,
+        existingId,
         newMenuItem: menuItem,
         deliveryTimeId,
         reason,
@@ -107,7 +113,9 @@ export function MealOverrideModal({
         </div>
 
         <Field label="Lunch day" required>
-          {fixedLunchKey ? (
+          {recurring ? (
+            <div className="flex h-11 items-center rounded-xl border border-line bg-cream-deep px-4 text-sm font-bold text-ink-soft">Monday · recurring every week</div>
+          ) : fixedLunchKey ? (
             /* Read-only when editing an existing order */
             <div className="flex h-11 items-center rounded-xl border border-line bg-cream-deep px-4 text-sm font-bold text-ink-soft">
               {keyToWeekday(fixedLunchKey)}
