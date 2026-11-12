@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import pb from "../../lib/pocketbase";
 import { buildLabels, labelsHtml, latestWeekdayTemplate, type LabelSheet } from "../../lib/labels";
-import { lunchDates, WEEKDAYS, type Weekday } from "../../lib/semester";
+import { WEEKDAYS, type Weekday } from "../../lib/semester";
 import { useSemester } from "../../lib/SemesterContext";
 import { isSampleSite } from "../../lib/site";
 import type { MealSelection, MenuItem, DeliveryTime } from "../../lib/types";
@@ -11,7 +11,6 @@ import { PageHeader } from "../../components/PageHeader";
 export default function Labels() {
   const {start,end}=useSemester();
   const recurring=!isSampleSite;
-  useMemo(()=>lunchDates(start,end),[start,end]);
   const [weekday,setWeekday]=useState<Weekday|"">(recurring?"Monday":"");
   const [busy,setBusy]=useState(false);
   const [sheet,setSheet]=useState<LabelSheet|null>(null);
