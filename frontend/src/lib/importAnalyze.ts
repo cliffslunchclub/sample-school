@@ -178,6 +178,7 @@ function buildIndexes(ref: RefData): Indexes {
   ref.selections.forEach((s) => {
     const dk = s.lunch_date ? s.lunch_date.slice(0, 10) : "";
     if (dk) selByKey.set(`${s.student}|${dk}`, s);
+    if (s.recurring_weekday === "Monday") selByKey.set(`${s.student}|__recurring_monday__|${s.menu_item}|${s.delivery_time || ""}`, s);
   });
   return { gradeByToken, teacherByKey, timeByNorm, menuByNorm, menuById, studentByKey, selByKey };
 }
@@ -230,7 +231,9 @@ export function analyzeCombined(
   const thursdayKey = extraKeys.thursday || "";
   const fridayKey = extraKeys.friday || "";
   const ix = buildIndexes(ref);
+  const recurring = mondayKey === "__recurring_monday__";
   const seen = new Set<string>();
+  const seenStudents = new Set<string>();
   const newTeacherKeys = new Set<string>();
   const matchedTeacherIds = new Set<string>();
   const out: AnalyzedRow[] = [];
@@ -283,6 +286,7 @@ export function analyzeCombined(
     const wednesdayMenuMatch = wednesdayMenuRaw ? fuzzyFindMenu(wednesdayMenuRaw, ix.menuByNorm) : undefined;
 
     if (mondayMenuRaw && !mondayKey) issues.push("No Monday date in the selected semester");
+    if (recurring && (tuesdayMenuRaw || wednesdayMenuRaw || thursdayMenuRaw || fridayMenuRaw)) issues.push("CHS recurring imports accept Monday meals only");
     if (mondayMenuMatch && (!mondayMenuMatch.active || !mondayMenuMatch.days?.includes("Monday"))) issues.push("Selected meal is not available on Monday");
     if (tuesdayMenuRaw && !tuesdayKey) issues.push("No Tuesday date in the selected semester");
     if (tuesdayMenuMatch && (!tuesdayMenuMatch.active || !tuesdayMenuMatch.days?.includes("Tuesday"))) issues.push("Selected meal is not available on Tuesday");
@@ -304,7 +308,10 @@ export function analyzeCombined(
     let fridayExistingMealName: string | undefined;
     if (studentMatch) {
       if (mondayMenuMatch) {
-        const ex = ix.selByKey.get(`${studentMatch.id}|${mondayKey}`);
+        const deliveryId = ix.timeByNorm.get(norm(deliveryRaw))?.id || "";
+        const ex = recurring
+          ? ix.selByKey.get(`${studentMatch.id}|__recurring_monday__|${mondayMenuMatch.id}|${deliveryId}`)
+          : ix.selByKey.get(`${studentMatch.id}|${mondayKey}`);
         if (ex) {
           mondayConflict = true;
           mondayExistingMealName = ix.menuById.get(ex.menu_item)?.name ?? "existing meal";
@@ -340,7 +347,10 @@ export function analyzeCombined(
       }
     }
 
-    const dupKey = `${norm(name)}|${gradeToken(gradeRaw)}|${norm(teacherRaw)}`;
+    const studentKey = `${norm(name)}|${gradeToken(gradeRaw)}|${norm(teacherRaw)}`;
+    // Two different lunches for one student are valid (e.g. Justin's two meals).
+    // An identical repeated CSV entry is still a duplicate.
+    const dupKey = recurring ? `${studentKey}|${norm(mondayMenuRaw)}|${norm(deliveryRaw)}` : studentKey;
     let status: RowStatus;
 
     if (issues.length) {
@@ -350,7 +360,10 @@ export function analyzeCombined(
       issues.push("Duplicate of an earlier row");
     } else {
       seen.add(dupKey);
-      if (!studentMatch) newStudents++; else matchedStudents++;
+      if (!seenStudents.has(studentKey)) {
+        if (!studentMatch) newStudents++; else matchedStudents++;
+        seenStudents.add(studentKey);
+      }
       if (teacherNew) newTeacherKeys.add(`${gradeToken(gradeRaw)}|${norm(teacherRaw)}`);
       else if (teacherMatch) matchedTeacherIds.add(teacherMatch.id);
       if (mondayMenuMatch) {
